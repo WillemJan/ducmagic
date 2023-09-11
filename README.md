@@ -1,4 +1,5 @@
 # Ducmagic
+# Dude, what are these bytes
 
 About
 =====
