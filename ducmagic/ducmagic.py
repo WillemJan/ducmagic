@@ -125,7 +125,7 @@ def get_file_types(wanted: set) -> list:
 
 
 def cli() -> any:
-    cmd_list = ["-h", "--help", "index", "ls"]
+    cmd_list = ["-h", "--help", "index", "ls", "info"]
 
     if len(sys.argv) == 1:  # No cmd g:
         sys.exit(-1)
@@ -133,6 +133,9 @@ def cli() -> any:
     if not sys.argv[1] in cmd_list:
         print(USEAGE)
         sys.exit(-1)
+
+    if sys.argv[1] == "info":
+        do_info()
 
     if sys.argv[1] == "index":
         if len(sys.argv) >= 2:
@@ -148,6 +151,8 @@ def cli() -> any:
                 res = do_ls(d, res)
         else:
             res = do_ls('.', res)
+
+
 
 
 def load_ducmagic() -> dict:
@@ -171,6 +176,10 @@ def load_ducmagic() -> dict:
         log.error(f"{error.strerror}")
         return {}
     return res
+
+def do_info():
+    print(len(load_ducmagic()))
+
 
 def do_ls(path: str, res: dict) -> dict:
     if not res:

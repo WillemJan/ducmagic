@@ -26,4 +26,4 @@ dependencies = [
 "Bug Tracker" = "https://github.com/willemjan/ducmagic/issues"
 
 [project.scripts]
-ducmagic = "ducmagic.ducmagic:cli"
+ducmagic = "ducmagic:cli"
