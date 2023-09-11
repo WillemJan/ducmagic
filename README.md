@@ -8,10 +8,11 @@ The wrapper uses the Duc for indexing files in directories and adds magic info t
 
 Usage
 ====
-
-'''
+```
 git clone https://github.com/WillemJan/ducmagic/
 pip install .
 ducmagic ls /
-'''
+```
+
+
 
