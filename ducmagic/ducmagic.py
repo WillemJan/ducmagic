@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import bz2
-import cmagic
+import datetime
 import gc
 import logging
 import mmap
@@ -12,6 +12,8 @@ import stat
 import subprocess
 import sys
 import time
+
+import cmagic
 
 # file_handler = logging.FileHandler(filename="tmp.log")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -153,8 +155,6 @@ def cli() -> any:
             res = do_ls('.', res)
 
 
-
-
 def load_ducmagic() -> dict:
     if not os.path.isfile(DUC_MAGIC_STORE):
         sys.stdout.write(
@@ -170,26 +170,37 @@ def load_ducmagic() -> dict:
             with bz2.open(fh) as d:
                 res = pickle.load(d)
         if log.level == logging.DEBUG:
-            log.debug(f"Done reading {DUC_MAGIC_STORE} in {time.time() - st} seconds.")
+            log.debug(
+                f"Done reading {DUC_MAGIC_STORE} in {time.time() - st} seconds.")
 
     except Exception as error:
         log.error(f"{error.strerror}")
         return {}
     return res
 
+
 def do_info():
-    print(len(load_ducmagic()))
+    if os.path.isfile(DUC_MAGIC_STORE):
+        m_time = os.path.getmtime(DUC_MAGIC_STORE)
+        # convert timestamp into DateTime object
+        dt_m = datetime.datetime.fromtimestamp(m_time)
+        print('Modified on:', dt_m)
+        res = load_ducmagic()
+        print('Known paths:')
+        for p in res.keys():
+            print('\t' + str(p))
 
 
 def do_ls(path: str, res: dict) -> dict:
     if not res:
-       res = load_ducmagic()
+        res = load_ducmagic()
     if not res.get(path):
         res = do_index(path)
 
     from pprint import pprint
     pprint(res.get(path))
     return res
+
 
 def do_index(path: str) -> dict:
     if os.path.isfile(DUC_MAGIC_STORE):
@@ -229,6 +240,7 @@ def do_index(path: str) -> dict:
         gc.enable()
 
     return res
+
 
 if __name__ == "__main__":
     cli()
