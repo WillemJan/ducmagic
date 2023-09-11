@@ -1,33 +1,61 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-
-import gc
-import pickle
-
-import stat
-import mmap
-
-import json
-
-import multiprocessing
-import subprocess
-
 import bz2
 import cmagic
+import gc
+import json
+import logging
+import mmap
+import multiprocessing
+import os
+import pickle
+import stat
+import subprocess
+import sys
 
-import argparse
+file_handler = logging.FileHandler(filename='tmp.log')
+stdout_handler = logging.StreamHandler(stream=sys.stdout)
+handlers = [file_handler, stdout_handler]
 
+logging.basicConfig(
+    level=logging.DEBUG, 
+    format='[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
+    handlers=handlers
+)
+
+logger = logging.getLogger(__name__)
+log = logger
 
 MIN_INSPECT = 30 # Nr of bytes to use for magic fingerprinting.
+
 PATH_NOT_IN_INDEX = 'Requested path not found' # Duc's friendly error msg.
 DUC_MAGIC_STORE = os.path.expanduser("~/.duc_magic.db") # Store output here for now, no questions asked.
+
+DUC_BINARY = '/usr/bin/duc' # Path to installed duc.
+DUC_PARAMS = 'ls -a -b -R --full-path' # Parameters to pass to duc. (apparent size, show bytes, recursion, show full_path)
 
 cmagic = cmagic.Magic(no_check_compress=True,
                       mime_encoding=False,
                       mime_type=True)
 cmagic.load()
+
+USEAGE = """Usage: ducmagic [options] [args]
+
+Available subcommands:
+
+  help      : Show help
+  index     : Scan the filesystem and generate the Duc index
+  info      : Dump database info
+  ls        : List sizes of directory
+
+Global options:
+  -h,  --help                show help
+       --version             output version information and exit
+
+Use 'ducmagic help <subcommand>' or 'ducmagic <subcommand> -h' for a complete list of all
+options and detailed description of the subcommand.
+
+Use 'ducmagic help --all' for a complete list of all options for all subcommands."""
 
 def get_file_type(file_path) -> str:
     global cmagic
@@ -49,7 +77,8 @@ def get_file_type(file_path) -> str:
         return magic_out, magic_bytes
 
 def get_duc_info(file_path: str) -> str:
-    cmd = f'/usr/bin/duc ls -a -b -R --full-path {file_path}'
+    #cmd = f'/usr/bin/duc ls -a -b -R --full-path {file_path}'
+    cmd = f'{DUC_BINARY} {DUC_PARAMS} {file_path}'
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     output, err = proc.communicate()
 
@@ -82,86 +111,124 @@ def remove_small_files(duc_info: str, base_path: str) -> (set, set):
 def get_file_types(wanted: set) -> list:
     with multiprocessing.Pool(5) as pool:
         file_types = pool.map(get_file_type, wanted)
-
     return file_types
 
 
 def cli() -> any:
-    parser = argparse.ArgumentParser(description="A command line tool for managing Ducmagic indexes")
+   cmd_list = ['-h', '--help', 'index', 'ls']
 
-    subparsers = parser.add_subparsers(title="Commands", dest="cmd")
+   if len(sys.argv) == 1: # No cmd g:
+      sys.exit(-1)
 
-    # Help subcommand
-    help_parser = subparsers.add_parser("help", help="Show help")
+   if not sys.argv[1] in cmd_list:
+      print(USEAGE)
+      sys.exit(-1)
 
-    # Index subcommand
-    index_parser = subparsers.add_parser("index", help="Scan the filesystem and generate the Ducmagic index")
-
-    # Info subcommand
-    info_parser = subparsers.add_parser("info", help="Dump database info")
-
-    # Ls subcommand
-    ls_parser = subparsers.add_parser("ls", help="List sizes and magic of directory")
-
-    # XML subcommand
-    xml_parser = subparsers.add_parser("xml", help="Dump XML output")
-
-    # Global options
-    parser.add_argument("--debug", action="store_true", help="increase verbosity to debug level")
-    parser.add_argument("-q", "--quiet", action="store_true", help="quiet mode, do not print any warning")
-    parser.add_argument("-v", "--verbose", action="store_true", help="increase verbosity")
-    parser.add_argument("--version", action="store_true", help="output version information and exit")
-
-    args = parser.parse_args()
-
-    if args.cmd is None:
-        parser.print_help()
-        exit(1)
-
-    if args.cmd == "help":
-        if args.subcommand is None:
-            parser.print_help()
-            exit(1)
-
-        getattr(parser.subparsers, args.subcommand).print_help()
-        exit(0)
-
-
-
-def main() -> any:
-    print(args)
-    path = '/home/aloha/code/'
-
-    with open(DUC_MAGIC_STORE, 'rb') as fh:
-        with bz2.open(fh) as d:
+   if sys.argv[1] == 'index':
+      if len(sys.argv) >= 2:
+         do_index(sys.argv[2:])
+      else:
+         do_index()
+      
+   if sys.argv[1] == 'ls':
+      if len(sys.argv) >= 2:
+         do_ls(sys.argv[2:])
+      else:
+         do_ls()
+ 
+def do_ls(path: str)-> any:
+   if not os.path.isfile(DUC_MAGIC_STORE):
+      sys.stdout.write(f"Unable to read ducmagic db {DUC_MAGIC_STORE}\n Could not ls, no data no ls.")
+     
+   log.debug(f"Trying to read {DUC_MAGIC_STORE}..")
+   if log.level == logging.DEBUG:
+      st = time.time()
+   try:
+      with open(DUC_MAGIC_STORE, 'rb') as fh:
+         with bz2.open(fh) as d:
             res = pickle.load(d)
+   except Exception as error:
+      print(dir(error))
+      log.error(f"{error.strerror}")
+      sys.exit(-1)
 
-    if not res.get(path):
-        res = {}
-        res[path] = {}
+   if log.level == logger.DEBUG:
+      log.debug(f"Done reading {DUC_MAGIC_STORE} in {time.time() - st} seconds.")
 
-        duc_info = get_duc_info(path)
-        wanted, unwanted = remove_small_files(duc_info, path)
-        file_types = get_file_types(wanted)
+   if not res.get(path):
+      res[path] = {}
 
-        for file_path, file_type in zip(wanted, file_types):
-            ftype = file_type[0]
-            if not ftype in res[path]:
-                res[path][ftype] = [file_path]
-            else:
-                res[path][ftype].append(file_path)
+      duc_info = get_duc_info(path)
+      wanted, unwanted = remove_small_files(duc_info, path)
+      file_types = get_file_types(wanted)
+
+      for file_path, file_type in zip(wanted, file_types):
+          ftype = file_type[0]
+          if not ftype in res[path]:
+              res[path][ftype] = [file_path]
+          else:
+              res[path][ftype].append(file_path)
+
+      log.debug(f"Trying to write out ducmagic db at {DUC_MAGIC_STORE}")
+      gc.disable()
+      try:
+          gc.collect()
+          with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
+              pickle.dump(res, fh)
+      except Exception as e:
+          log.fatal(f"Error while writing to {DUC_MAGIC_STORE}")
+          sys.exit(-1)
+      finally:
+          gc.enable()
+   else:
+      print("Noting todo magic is there!!") 
 
 
-        gc.disable()
-        try:
-            gc.collect()
-            with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
-                pickle.dump(res, fh)
-        finally:
-            gc.enable()
+def do_index(path: str)-> any:
+   if os.path.isfile(DUC_MAGIC_STORE):
+      log.debug(f"Trying to read {DUC_MAGIC_STORE}..")
+      if log.level == logger.DEBUG:
+         st = time.time()
+      try:
+         with open(DUC_MAGIC_STORE, 'rb') as fh:
+            with bz2.open(fh) as d:
+               res = pickle.load(d)
+      except Exception as error:
+         log.error(f"{error.strerror}")
+         sys.exit(-1)
+      if log.level == logger.DEBUG:
+         log.debug(f"Done reading {DUC_MAGIC_STORE} in {time.time() - st} seconds.")
+   else:
+      log.debug(f"No ducmagic db found at {DUC_MAGIC_STORE}")
+      res = {}
 
-    #from pprint import pprint
-    #pprint(len(res.get(path)))
+   if not res.get(path):
+      res[path] = {}
+
+      duc_info = get_duc_info(path)
+      wanted, unwanted = remove_small_files(duc_info, path)
+      file_types = get_file_types(wanted)
+
+      for file_path, file_type in zip(wanted, file_types):
+          ftype = file_type[0]
+          if not ftype in res[path]:
+              res[path][ftype] = [file_path]
+          else:
+              res[path][ftype].append(file_path)
+
+      log.debug(f"Trying to write out ducmagic db at {DUC_MAGIC_STORE}")
+      gc.disable()
+      try:
+          gc.collect()
+          with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
+              pickle.dump(res, fh)
+      except Exception as e:
+          log.fatal(f"Error while writing to {DUC_MAGIC_STORE}")
+          sys.exit(-1)
+      finally:
+          gc.enable()
+   else:
+      print("Noting todo magic is there!!") 
 
 if __name__ == "__main__":
-    main()
+    cli()
