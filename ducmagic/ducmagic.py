@@ -28,6 +28,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 log = logger
+log.setLevel(logging.DEBUG)
 
 MIN_INSPECT = 30  # Nr of bytes to use for magic fingerprinting.
 
@@ -45,7 +46,7 @@ cmagic = cmagic.Magic(no_check_compress=True,
                       mime_type=True)
 cmagic.load()
 
-USEAGE = """Usage: ducmagic [options] [args]
+USAGE = """Usage: ducmagic [options] [args]
 
 Available subcommands:
 
@@ -94,10 +95,10 @@ def get_duc_info(file_path: str) -> str:
 
     if err:
         if err.decode().startswith(PATH_NOT_IN_INDEX):
-            sys.stdout.write(PATH_NOT_IN_INDEX + "\n")
+            log.error(f'Error: {file_path} not in duc db.')
             sys.exit(-1)
         else:
-            sys.stdout.write(err.decode())
+            log.error(err.decode())
             sys.exit(-1)
 
     return output.decode()
@@ -133,7 +134,7 @@ def cli() -> any:
         sys.exit(-1)
 
     if not sys.argv[1] in cmd_list:
-        print(USEAGE)
+        print(USAGE)
         sys.exit(-1)
 
     if sys.argv[1] == "info":
@@ -141,28 +142,33 @@ def cli() -> any:
 
     if sys.argv[1] == "index":
         if len(sys.argv) >= 2:
+            res = load_ducmagic()
             for d in sys.argv[2:]:
-                res = do_index(d)
+                d = os.path.abspath(os.path.expanduser(d))
+                res = do_index(d, res)
         else:
-            res = do_index('.')
+            res = load_ducmagic()
+            d = os.getcwd()
+            res = do_index(d, res)
 
     if sys.argv[1] == "ls":
         if len(sys.argv) >= 2:
             res = load_ducmagic()
             for d in sys.argv[2:]:
+                d = os.path.abspath(os.path.expanduser(d))
                 res = do_ls(d, res)
         else:
-            res = do_ls('.', res)
+            res = load_ducmagic()
+            d = os.getcwd()
+            res = do_ls(d, res)
 
 
 def load_ducmagic() -> dict:
     if not os.path.isfile(DUC_MAGIC_STORE):
-        sys.stdout.write(
-            f"Unable to read ducmagic db {DUC_MAGIC_STORE}\n"
-        )
+        log.warn(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
         return {}
 
-    log.debug(f"Trying to read {DUC_MAGIC_STORE}..")
+    log.debug(f"Trying to read {DUC_MAGIC_STORE}.")
     if log.level == logging.DEBUG:
         st = time.time()
     try:
@@ -183,12 +189,13 @@ def do_info():
     if os.path.isfile(DUC_MAGIC_STORE):
         m_time = os.path.getmtime(DUC_MAGIC_STORE)
         # convert timestamp into DateTime object
-        dt_m = datetime.datetime.fromtimestamp(m_time)
-        print('Modified on:', dt_m)
+        dt_m = str(datetime.datetime.fromtimestamp(m_time))
+        log.info(f'Modified on: {dt_m}')
         res = load_ducmagic()
-        print('Known paths:')
         for p in res.keys():
-            print('\t' + str(p))
+            log.info(f'Path found: {p}')
+    else:
+        log.info(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
 
 
 def do_ls(path: str, res: dict) -> dict:
