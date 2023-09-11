@@ -66,6 +66,18 @@ Use 'ducmagic help --all' for a complete list of all options for all subcommands
 
 
 def get_file_type(file_path) -> str:
+    '''
+    Returns the magic of a given file.
+            Parameters:
+                    file_path (str): Path to examine.
+
+            Returns:
+                    magic_out (str): Magic type. (eg. Text/html).
+                    magic_bytes (bytes): The first X bytes from the entry.
+
+    This function runs without seat-belts so it might crash,
+    this is on purpose for now.
+    '''
     global cmagic
 
     file_path = file_path[0]
@@ -82,12 +94,28 @@ def get_file_type(file_path) -> str:
         mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         magic_bytes = mm.read(MIN_INSPECT)
         magic_out = cmagic.guess_bytes(magic_bytes)
+        # I'm not sure why I pass on the actual bytes here.
+        # maybe for futher inspection? The mind is a mystery.
         return magic_out, magic_bytes
 
 
-def call_duc(cmd: str) -> str:
+def do_cmd(cmd: str) -> str:
+    '''
+    Returns the output of a shell command.
+
+            Parameters:
+                    cmd (str): The command to execute.
+
+            Returns:
+                    output (str): The result from the shell command.
+
+    On error (stderr) this command halts the running code.
+    '''
     proc = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True
     )
     output, err = proc.communicate()
 
@@ -103,14 +131,37 @@ def call_duc(cmd: str) -> str:
 
 
 def get_duc_info() -> str:
+    '''
+    Returns info on the current duc db.
+
+            Parameters:
+                    None
+
+            Returns:
+                    output (str): see man duc(1) section info.
+    '''
     cmd = f"{DUC_BINARY} info"
-    return call_duc(cmd)
+    return do_cmd(cmd)
 
 def get_duc_path(file_path: str) -> str:
+    '''
+    Returns contents of duc db for given path.
+
+            Parameters:
+                    file_path (str): Path to get from duc db.
+
+            Returns:
+                    output (str): see man duc(1) section ls.
+    '''
     cmd = f"{DUC_BINARY} {DUC_PARAMS} {file_path}"
-    return call_duc(cmd)
+    return do_cmd(cmd)
 
 def remove_small_files(duc_info: str, base_path: str) -> (set, set):
+    '''
+    Split duc ls entries into < MIN_INSPECT and > MIN_INSPECT sets,
+    otherwise mmap(read) will fail due to lack of bytes.
+    '''
+
     wanted, unwanted = set(), set()
 
     for line in duc_info.splitlines():
@@ -128,15 +179,27 @@ def remove_small_files(duc_info: str, base_path: str) -> (set, set):
 
 
 def get_file_types(wanted: set) -> list:
-    with multiprocessing.Pool(5) as pool:
+    '''
+    Invoke multicore to quickly get the magic fingerprints.
+
+        Parameters:
+                wanted (set): Set of entries to process.
+
+        Returns:
+                list of file types using magic.
+    '''
+    with multiprocessing.Pool() as pool:
         file_types = pool.map(get_file_type, wanted)
     return file_types
 
 
 def cli() -> any:
+    '''
+    Command Line Interface.
+    '''
     cmd_list = ["-h", "--help", "index", "ls", "info"]
 
-    if len(sys.argv) == 1:  # No cmd g:
+    if len(sys.argv) == 1:
         sys.exit(-1)
 
     if not sys.argv[1] in cmd_list:
@@ -170,6 +233,17 @@ def cli() -> any:
 
 
 def load_ducmagic() -> dict:
+    '''
+    Load the (compressed) ducmagic db from disk,
+    defaults to ~/.duc_magic.db
+
+        Parameters:
+                None
+
+        Returns:
+                Decompressed ducmagic database as dict.
+
+    '''
     if not os.path.isfile(DUC_MAGIC_STORE):
         log.warn(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
         return {}
@@ -193,6 +267,8 @@ def load_ducmagic() -> dict:
 
 def do_info():
     if os.path.isfile(DUC_MAGIC_STORE):
+        # todo: work with timestamps in ducmagic db.
+
         m_time = os.path.getmtime(DUC_MAGIC_STORE)
         # convert timestamp into DateTime object
         dt_m = str(datetime.datetime.fromtimestamp(m_time))
@@ -213,6 +289,8 @@ def do_ls(path: str, res: dict) -> dict:
         res[path] = {}
         res = do_index(path, res)
 
+
+    # todo: implement repr function
     from pprint import pprint
     pprint(res.get(path))
     return res
