@@ -137,23 +137,25 @@ def cli() -> any:
     if sys.argv[1] == "index":
         if len(sys.argv) >= 2:
             for d in sys.argv[2:]:
-                do_index(d)
+                res = do_index(d)
         else:
-            do_index()
+            res = do_index('.')
 
     if sys.argv[1] == "ls":
         if len(sys.argv) >= 2:
+            res = load_ducmagic()
             for d in sys.argv[2:]:
-                do_ls(d)
+                res = do_ls(d, res)
         else:
-            do_ls()
+            res = do_ls('.', res)
 
 
-def do_ls(path: str) -> any:
+def load_ducmagic() -> dict:
     if not os.path.isfile(DUC_MAGIC_STORE):
         sys.stdout.write(
-            f"Unable to read ducmagic db {DUC_MAGIC_STORE}\n Could not ls, no data no ls."
+            f"Unable to read ducmagic db {DUC_MAGIC_STORE}\n"
         )
+        return {}
 
     log.debug(f"Trying to read {DUC_MAGIC_STORE}..")
     if log.level == logging.DEBUG:
@@ -167,29 +169,22 @@ def do_ls(path: str) -> any:
 
     except Exception as error:
         log.error(f"{error.strerror}")
-        sys.exit(-1)
+        return {}
+    return res
 
+def do_ls(path: str, res: dict) -> dict:
+    if not res:
+       res = load_ducmagic()
     if not res.get(path):
         res = do_index(path)
 
     from pprint import pprint
     pprint(res.get(path))
+    return res
 
-
-def do_index(path: str) -> any:
+def do_index(path: str) -> dict:
     if os.path.isfile(DUC_MAGIC_STORE):
-        log.debug(f"Trying to read {DUC_MAGIC_STORE}..")
-        if log.level == logging.DEBUG:
-            st = time.time()
-        try:
-            with open(DUC_MAGIC_STORE, "rb") as fh:
-                with bz2.open(fh) as d:
-                    res = pickle.load(d)
-        except Exception as error:
-            log.error(f"{error.strerror}")
-            sys.exit(-1)
-        if log.level == logging.DEBUG:
-            log.debug(f"Reading {DUC_MAGIC_STORE} in {time.time() - st} seconds.")
+        res = load_ducmagic()
     else:
         log.debug(f"No ducmagic db found at {DUC_MAGIC_STORE}")
         res = {}
@@ -223,6 +218,8 @@ def do_index(path: str) -> any:
         sys.exit(-1)
     finally:
         gc.enable()
+
+    return res
 
 if __name__ == "__main__":
     cli()
