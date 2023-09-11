@@ -202,19 +202,21 @@ def do_ls(path: str, res: dict) -> dict:
     if not res:
         res = load_ducmagic()
     if not res.get(path):
-        res = do_index(path)
+        res[path] = {}
+        res = do_index(path, res)
 
     from pprint import pprint
     pprint(res.get(path))
     return res
 
 
-def do_index(path: str) -> dict:
+def do_index(path: str, res: dict) -> dict:
     if os.path.isfile(DUC_MAGIC_STORE):
         res = load_ducmagic()
     else:
         log.debug(f"No ducmagic db found at {DUC_MAGIC_STORE}")
-        res = {}
+        if not res:
+            res = {}
 
     if not res.get(path):
         res[path] = {}
