@@ -22,8 +22,8 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/pypa/sampleproject"
-"Bug Tracker" = "https://github.com/pypa/sampleproject/issues"
+"Homepage" = "https://github.com/willemjan/ducmagic"
+"Bug Tracker" = "https://github.com/willemjan/ducmagic/issues"
 
 [project.scripts]
 ducmagic = "ducmagic.ducmagic:cli"
