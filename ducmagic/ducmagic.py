@@ -85,9 +85,7 @@ def get_file_type(file_path) -> str:
         return magic_out, magic_bytes
 
 
-def get_duc_info(file_path: str) -> str:
-    # cmd = f'/usr/bin/duc ls -a -b -R --full-path {file_path}'
-    cmd = f"{DUC_BINARY} {DUC_PARAMS} {file_path}"
+def call_duc(cmd: str) -> str:
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
     )
@@ -103,6 +101,14 @@ def get_duc_info(file_path: str) -> str:
 
     return output.decode()
 
+
+def get_duc_info() -> str:
+    cmd = f"{DUC_BINARY} info"
+    return call_duc(cmd)
+
+def get_duc_path(file_path: str) -> str:
+    cmd = f"{DUC_BINARY} {DUC_PARAMS} {file_path}"
+    return call_duc(cmd)
 
 def remove_small_files(duc_info: str, base_path: str) -> (set, set):
     wanted, unwanted = set(), set()
@@ -194,6 +200,8 @@ def do_info():
         res = load_ducmagic()
         for p in res.keys():
             log.info(f'Path found: {p}')
+        for line in get_duc_info().splitlines():
+            print(line)
     else:
         log.info(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
 
@@ -224,7 +232,7 @@ def do_index(path: str, res: dict) -> dict:
         log.debug(f"Re-indexing {path}")
         res[path] = {}
 
-    duc_info = get_duc_info(path)
+    duc_info = get_duc_path(path)
     wanted, unwanted = remove_small_files(duc_info, path)
     file_types = get_file_types(wanted)
 
