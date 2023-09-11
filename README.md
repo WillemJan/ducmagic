@@ -12,7 +12,7 @@ Usage
 
 ```
 git clone https://github.com/WillemJan/ducmagic/
-pip install .
+cd ducmagic && pip install .
 rm ~/.duc_magic.db; ducmagic index . ; ducmagic ls .
 ```
 
