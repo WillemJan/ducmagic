@@ -136,13 +136,15 @@ def cli() -> any:
 
     if sys.argv[1] == "index":
         if len(sys.argv) >= 2:
-            do_index(sys.argv[2:])
+            for d in sys.argv[2:]:
+                do_index(d)
         else:
             do_index()
 
     if sys.argv[1] == "ls":
         if len(sys.argv) >= 2:
-            do_ls(sys.argv[2:])
+            for d in sys.argv[2:]:
+                do_ls(d)
         else:
             do_ls()
 
@@ -160,47 +162,24 @@ def do_ls(path: str) -> any:
         with open(DUC_MAGIC_STORE, "rb") as fh:
             with bz2.open(fh) as d:
                 res = pickle.load(d)
+        if log.level == logging.DEBUG:
+            log.debug(f"Done reading {DUC_MAGIC_STORE} in {time.time() - st} seconds.")
+
     except Exception as error:
         log.error(f"{error.strerror}")
         sys.exit(-1)
 
-    if log.level == logger.DEBUG:
-        log.debug(f"Done reading {DUC_MAGIC_STORE} in {time.time() - st} seconds.")
-
     if not res.get(path):
-        res[path] = {}
+        res = do_index(path)
 
-        duc_info = get_duc_info(path)
-        wanted, unwanted = remove_small_files(duc_info, path)
-        file_types = get_file_types(wanted)
-
-        for file_path, file_type in zip(wanted, file_types):
-            ftype = file_type[0]
-            if ftype not in res[path]:
-                res[path][ftype] = [file_path]
-            else:
-                res[path][ftype].append(file_path)
-
-        log.debug(f"Trying to write out ducmagic db at {DUC_MAGIC_STORE}")
-        gc.disable()
-        try:
-            gc.collect()
-            with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
-                pickle.dump(res, fh)
-        except Exception as error:
-            log.error(f"{error.strerror}")
-            log.fatal(f"Error while writing to {DUC_MAGIC_STORE}")
-            sys.exit(-1)
-        finally:
-            gc.enable()
-    else:
-        print("Noting todo magic is there!!")
+    from pprint import pprint
+    pprint(res.get(path))
 
 
 def do_index(path: str) -> any:
     if os.path.isfile(DUC_MAGIC_STORE):
         log.debug(f"Trying to read {DUC_MAGIC_STORE}..")
-        if log.level == logger.DEBUG:
+        if log.level == logging.DEBUG:
             st = time.time()
         try:
             with open(DUC_MAGIC_STORE, "rb") as fh:
@@ -209,7 +188,7 @@ def do_index(path: str) -> any:
         except Exception as error:
             log.error(f"{error.strerror}")
             sys.exit(-1)
-        if log.level == logger.DEBUG:
+        if log.level == logging.DEBUG:
             log.debug(f"Reading {DUC_MAGIC_STORE} in {time.time() - st} seconds.")
     else:
         log.debug(f"No ducmagic db found at {DUC_MAGIC_STORE}")
@@ -217,33 +196,33 @@ def do_index(path: str) -> any:
 
     if not res.get(path):
         res[path] = {}
-
-        duc_info = get_duc_info(path)
-        wanted, unwanted = remove_small_files(duc_info, path)
-        file_types = get_file_types(wanted)
-
-        for file_path, file_type in zip(wanted, file_types):
-            ftype = file_type[0]
-            if ftype not in res[path]:
-                res[path][ftype] = [file_path]
-            else:
-                res[path][ftype].append(file_path)
-
-        log.debug(f"Trying to write out ducmagic db at {DUC_MAGIC_STORE}")
-        gc.disable()
-        try:
-            gc.collect()
-            with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
-                pickle.dump(res, fh)
-        except Exception as error:
-            log.error(f"{error.strerror}")
-            log.fatal(f"Error while writing to {DUC_MAGIC_STORE}")
-            sys.exit(-1)
-        finally:
-            gc.enable()
     else:
-        print("Noting todo magic is there!!")
+        log.debug(f"Re-indexing {path}")
+        res[path] = {}
 
+    duc_info = get_duc_info(path)
+    wanted, unwanted = remove_small_files(duc_info, path)
+    file_types = get_file_types(wanted)
+
+    for file_path, file_type in zip(wanted, file_types):
+        ftype = file_type[0]
+        if ftype not in res[path]:
+            res[path][ftype] = [file_path]
+        else:
+            res[path][ftype].append(file_path)
+
+    log.debug(f"Trying to write out ducmagic db at {DUC_MAGIC_STORE}")
+    gc.disable()
+    try:
+        gc.collect()
+        with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
+            pickle.dump(res, fh)
+    except Exception as error:
+        log.error(f"{error.strerror}")
+        log.fatal(f"Error while writing to {DUC_MAGIC_STORE}")
+        sys.exit(-1)
+    finally:
+        gc.enable()
 
 if __name__ == "__main__":
     cli()
