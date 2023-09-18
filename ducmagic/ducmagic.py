@@ -12,41 +12,41 @@ import stat
 import subprocess
 import sys
 import time
+import doctest
 
 import cmagic
 
-# file_handler = logging.FileHandler(filename="tmp.log")
-stdout_handler = logging.StreamHandler(stream=sys.stdout)
-handlers = [stdout_handler]
+try:
+    from helper import setup_logger
+except ImportError:
+    from .helper import setup_logger
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="[%(asctime)s] {%(filename)s:" +
-           "%(lineno)d} %(levelname)s - %(message)s",
-    handlers=handlers,
-)
-
-logger = logging.getLogger(__name__)
-log = logger
-log.setLevel(logging.DEBUG)
+from pprint import pprint
 
 MIN_INSPECT = 30  # Nr of bytes to use for magic fingerprinting.
 
 PATH_NOT_IN_INDEX = "Requested path not found"  # Duc's friendly error msg.
+
 DUC_MAGIC_STORE = os.path.expanduser(
     "~/.duc_magic.db"
 )  # Store output here for now, no questions asked.
 
 DUC_BINARY = "/usr/bin/duc"  # Path to installed duc.
-# Parameters to pass to duc. (apparent size, show bytes, recursion, show full_path)
+# Parameters to pass to duc.
+# (apparent size, show bytes, recursion, show full_path)
+
 DUC_PARAMS = "ls -a -b -R --full-path"
+
 
 cmagic = cmagic.Magic(no_check_compress=True,
                       mime_encoding=False,
                       mime_type=True)
 cmagic.load()
 
-USAGE = """Usage: ducmagic [options] [args]
+
+log = setup_logger()
+
+USAGE = '''Usage: ducmagic [options] [args]
 
 Available subcommands:
 
@@ -62,7 +62,8 @@ Global options:
 Use 'ducmagic help <subcommand>' or 'ducmagic <subcommand> -h' for a complete list of all
 options and detailed description of the subcommand.
 
-Use 'ducmagic help --all' for a complete list of all options for all subcommands."""
+Use 'ducmagic help --all' for a complete list of all options for all subcommands.
+'''
 
 
 def get_file_type(file_path) -> str:
@@ -77,7 +78,12 @@ def get_file_type(file_path) -> str:
 
     This function runs without seat-belts so it might crash,
     this is on purpose for now.
+
+    >>> f = [f for f in os.listdir('.') if os.path.isfile(f)]
+    >>> len(get_file_type(f)) > 0
+    True
     '''
+
     global cmagic
 
     file_path = file_path[0]
@@ -110,6 +116,9 @@ def do_cmd(cmd: str) -> str:
                     output (str): The result from the shell command.
 
     On error (stderr) this command halts the running code.
+
+    >>> do_cmd('ls ' + __file__).find(__file__) > -1
+    True
     '''
     proc = subprocess.Popen(
         cmd,
@@ -121,7 +130,8 @@ def do_cmd(cmd: str) -> str:
 
     if err:
         if err.decode().startswith(PATH_NOT_IN_INDEX):
-            log.error(f'Error: {file_path} not in duc db.')
+            # todo: continue, but invoke duc.
+            # log.error(f'Error: {file_path} not in duc db.')
             sys.exit(-1)
         else:
             log.error(err.decode())
@@ -139,9 +149,13 @@ def get_duc_info() -> str:
 
             Returns:
                     output (str): see man duc(1) section info.
+
+    >>> len(get_duc_info()) > 0
+    True
     '''
     cmd = f"{DUC_BINARY} info"
     return do_cmd(cmd)
+
 
 def get_duc_path(file_path: str) -> str:
     '''
@@ -152,16 +166,26 @@ def get_duc_path(file_path: str) -> str:
 
             Returns:
                     output (str): see man duc(1) section ls.
+
+    >>> len(get_duc_path('.')) > 0
+    True
     '''
     cmd = f"{DUC_BINARY} {DUC_PARAMS} {file_path}"
     return do_cmd(cmd)
+
 
 def remove_small_files(duc_info: str, base_path: str) -> (set, set):
     '''
     Split duc ls entries into < MIN_INSPECT and > MIN_INSPECT sets,
     otherwise mmap(read) will fail due to lack of bytes.
-    '''
 
+            Parameters:
+                    duc_info (str): Output of the duc ls command.
+
+            Returns:
+                    wanted (set): Set of files that need magic.
+                    unwanted (set): Set of files that do not need magic.
+    '''
     wanted, unwanted = set(), set()
 
     for line in duc_info.splitlines():
@@ -187,27 +211,36 @@ def get_file_types(wanted: set) -> list:
 
         Returns:
                 list of file types using magic.
+
     '''
     with multiprocessing.Pool() as pool:
         file_types = pool.map(get_file_type, wanted)
     return file_types
 
 
-def cli() -> any:
+def cli(args=sys.argv) -> any:
     '''
     Command Line Interface.
     '''
-    cmd_list = ["-h", "--help", "index", "ls", "info"]
+    cmd_list = ["-h", "--help", "index", "ls", "info", "--test"]
 
     if len(sys.argv) == 1:
+        print("No argument given.")
+        print(USAGE)
         sys.exit(-1)
 
     if not sys.argv[1] in cmd_list:
+        print(f"Error, {sys.argv[1]} not a known argument.")
         print(USAGE)
         sys.exit(-1)
 
     if sys.argv[1] == "info":
         do_info()
+        sys.exit(0)
+
+    if sys.argv[1] == "--help":
+        print(USAGE)
+        sys.exit(0)
 
     if sys.argv[1] == "index":
         if len(sys.argv) >= 2:
@@ -220,16 +253,16 @@ def cli() -> any:
             d = os.getcwd()
             res = do_index(d, res)
 
+    ls_res = []
     if sys.argv[1] == "ls":
-        if len(sys.argv) >= 2:
-            res = load_ducmagic()
+        res = load_ducmagic()
+        if len(sys.argv[2:]) > 0:
             for d in sys.argv[2:]:
                 d = os.path.abspath(os.path.expanduser(d))
-                res = do_ls(d, res)
+                ls_res.append(do_ls(d, res))
         else:
-            res = load_ducmagic()
-            d = os.getcwd()
-            res = do_ls(d, res)
+            d = os.path.abspath(os.getcwd())
+            ls_res.append(do_ls(d, res))
 
 
 def load_ducmagic() -> dict:
@@ -251,26 +284,19 @@ def load_ducmagic() -> dict:
     log.debug(f"Trying to read {DUC_MAGIC_STORE}.")
     if log.level == logging.DEBUG:
         st = time.time()
-    try:
-        with open(DUC_MAGIC_STORE, "rb") as fh:
-            with bz2.open(fh) as d:
-                res = pickle.load(d)
-        if log.level == logging.DEBUG:
-            log.debug(
-                f"Done reading {DUC_MAGIC_STORE} in {time.time() - st} seconds.")
-
-    except Exception as error:
-        log.error(f"{error.strerror}")
-        return {}
+    with open(DUC_MAGIC_STORE, "rb") as fh:
+        with bz2.open(fh) as d:
+            res = pickle.load(d)
+    if log.level == logging.DEBUG:
+        log.debug(
+            f"Read {DUC_MAGIC_STORE} in {time.time() - st} sec.")
     return res
 
 
 def do_info():
     if os.path.isfile(DUC_MAGIC_STORE):
         # todo: work with timestamps in ducmagic db.
-
         m_time = os.path.getmtime(DUC_MAGIC_STORE)
-        # convert timestamp into DateTime object
         dt_m = str(datetime.datetime.fromtimestamp(m_time))
         log.info(f'Modified on: {dt_m}')
         res = load_ducmagic()
@@ -285,15 +311,14 @@ def do_info():
 def do_ls(path: str, res: dict) -> dict:
     if not res:
         res = load_ducmagic()
-    if not res.get(path):
-        res[path] = {}
-        res = do_index(path, res)
 
+    if path not in res:
+        print(f'{path} not found in {DUC_MAGIC_STORE}, \
+              run ducmagic index {path} first.')
+        return {}
 
-    # todo: implement repr function
-    from pprint import pprint
     pprint(res.get(path))
-    return res
+    return res.get(path)
 
 
 def do_index(path: str, res: dict) -> dict:
@@ -323,6 +348,7 @@ def do_index(path: str, res: dict) -> dict:
 
     log.debug(f"Trying to write out ducmagic db at {DUC_MAGIC_STORE}")
     gc.disable()
+
     try:
         gc.collect()
         with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
@@ -337,5 +363,5 @@ def do_index(path: str, res: dict) -> dict:
     return res
 
 
-if __name__ == "__main__":
-    cli()
+if __name__ == '__main__':
+    doctest.testmod(verbose=True)
