@@ -5,10 +5,6 @@
 
 cd /home/ducmagic/
 
-rm -rf ducmagic/
-rm -rf venv/
-rm -rf .duc*
-
 git clone https://github.com/WillemJan/ducmagic/
 virtualenv venv
 
@@ -21,5 +17,3 @@ pip install .
 cd ..
 ducmagic index .
 ducmagic ls
-
-source venv/bin/deactivate
