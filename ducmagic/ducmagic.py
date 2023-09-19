@@ -9,7 +9,6 @@ import multiprocessing
 import os
 import pickle
 import stat
-import subprocess
 import sys
 import time
 import doctest
@@ -17,26 +16,27 @@ import doctest
 import cmagic
 
 try:
-    from helper import setup_logger
+    from helper import setup_logger, \
+                       do_cmd, \
+                       E_DATABASE_NOT_FOUND
 except ImportError:
-    from .helper import setup_logger
+    from .helper import setup_logger, \
+                        do_cmd, \
+                        E_DATABASE_NOT_FOUND
 
 from pprint import pprint
 
 MIN_INSPECT = 30  # Nr of bytes to use for magic fingerprinting.
-
-PATH_NOT_IN_INDEX = "Requested path not found"  # Duc's friendly error msg.
 
 DUC_MAGIC_STORE = os.path.expanduser(
     "~/.duc_magic.db"
 )  # Store output here for now, no questions asked.
 
 DUC_BINARY = "/usr/bin/duc"  # Path to installed duc.
+
 # Parameters to pass to duc.
 # (apparent size, show bytes, recursion, show full_path)
-
 DUC_PARAMS = "ls -a -b -R --full-path"
-
 
 cmagic = cmagic.Magic(no_check_compress=True,
                       mime_encoding=False,
@@ -54,6 +54,7 @@ Available subcommands:
   index     : Scan the filesystem and generate the Duc index
   info      : Dump database info
   ls        : List sizes of directory
+  sync      : Sync ducmagic with duc
 
 Global options:
   -h,  --help                show help
@@ -66,15 +67,38 @@ Use 'ducmagic help --all' for a complete list of all options for all subcommands
 '''
 
 
+def do_is_sane() -> int:
+    '''
+    We refuse to directly communicate with the linkable .so from the
+    upstream duc procject, so at startup we must make sure we are sane.
+
+        Parameters:
+                None
+
+        Returns:
+               sanity level (int):
+                    -1 Duc missing.
+                    0 Duc found.
+                    1 Duc found, duc_db found.
+                    2 Duc found, duc info is avail.
+              duc_paths (set):
+                    duc_paths available set.
+    '''
+
+    # todo
+    return
+
+
 def get_file_type(file_path) -> str:
     '''
     Returns the magic of a given file.
-            Parameters:
-                    file_path (str): Path to examine.
 
-            Returns:
-                    magic_out (str): Magic type. (eg. Text/html).
-                    magic_bytes (bytes): The first X bytes from the entry.
+        Parameters:
+            file_path (str): Path to examine.
+
+        Returns:
+            magic_out (str): Magic type. (eg. Text/html).
+            magic_bytes (bytes): The first X bytes from the entry.
 
     This function runs without seat-belts so it might crash,
     this is on purpose for now.
@@ -105,54 +129,20 @@ def get_file_type(file_path) -> str:
         return magic_out, magic_bytes
 
 
-def do_cmd(cmd: str) -> str:
-    '''
-    Returns the output of a shell command.
-
-            Parameters:
-                    cmd (str): The command to execute.
-
-            Returns:
-                    output (str): The result from the shell command.
-
-    On error (stderr) this command halts the running code.
-
-    >>> do_cmd('ls ' + __file__).find(__file__) > -1
-    True
-    '''
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=True
-    )
-    output, err = proc.communicate()
-
-    if err:
-        if err.decode().startswith(PATH_NOT_IN_INDEX):
-            # todo: continue, but invoke duc.
-            # log.error(f'Error: {file_path} not in duc db.')
-            sys.exit(-1)
-        else:
-            log.error(err.decode())
-            sys.exit(-1)
-
-    return output.decode()
-
-
 def get_duc_info() -> str:
     '''
     Returns info on the current duc db.
 
-            Parameters:
-                    None
+        Parameters:
+            None
 
-            Returns:
-                    output (str): see man duc(1) section info.
+        Returns:
+            output (str): See man duc(1) section info.
 
-    >>> len(get_duc_info()) > 0
+    >>> len(get_duc_info()) >= 0
     True
     '''
+
     cmd = f"{DUC_BINARY} info"
     return do_cmd(cmd)
 
@@ -165,7 +155,7 @@ def get_duc_path(file_path: str) -> str:
                     file_path (str): Path to get from duc db.
 
             Returns:
-                    output (str): see man duc(1) section ls.
+                    output (str): See man duc(1) section ls.
 
     >>> len(get_duc_path('.')) > 0
     True
@@ -179,17 +169,22 @@ def remove_small_files(duc_info: str, base_path: str) -> (set, set):
     Split duc ls entries into < MIN_INSPECT and > MIN_INSPECT sets,
     otherwise mmap(read) will fail due to lack of bytes.
 
-            Parameters:
-                    duc_info (str): Output of the duc ls command.
+        Parameters:
+            duc_info (str): Output of the duc ls command.
 
-            Returns:
-                    wanted (set): Set of files that need magic.
-                    unwanted (set): Set of files that do not need magic.
+        Returns:
+            wanted (set): Set of files that need magic.
+            unwanted (set): Set of files that do not need magic.
     '''
+
     wanted, unwanted = set(), set()
 
     for line in duc_info.splitlines():
         line = line.strip()
+
+        if line == E_DATABASE_NOT_FOUND:
+            continue
+
         fsize = int(line.split(" ")[0])
         fname = line[len(str(fsize)) + 1:]
 
@@ -207,22 +202,27 @@ def get_file_types(wanted: set) -> list:
     Invoke multicore to quickly get the magic fingerprints.
 
         Parameters:
-                wanted (set): Set of entries to process.
-
+            wanted (set): Set of entries to process.
         Returns:
-                list of file types using magic.
-
+            file_types (list): List of file types using magic.
     '''
+
     with multiprocessing.Pool() as pool:
         file_types = pool.map(get_file_type, wanted)
+
     return file_types
 
 
 def cli(args=sys.argv) -> any:
     '''
     Command Line Interface.
+
+    Takes in errors from users,
+    and tries to make the best of it.
     '''
-    cmd_list = ["-h", "--help", "index", "ls", "info", "--test"]
+
+    cmd_list = ["-h", "--help", "index",
+                "ls", "info", "--test"]
 
     if len(sys.argv) == 1:
         print("No argument given.")
@@ -251,7 +251,7 @@ def cli(args=sys.argv) -> any:
         else:
             res = load_ducmagic()
             d = os.getcwd()
-            res = do_index(d, res)
+            res = do_index(d)
 
     ls_res = []
     if sys.argv[1] == "ls":
@@ -271,26 +271,43 @@ def load_ducmagic() -> dict:
     defaults to ~/.duc_magic.db
 
         Parameters:
-                None
+            None
 
         Returns:
-                Decompressed ducmagic database as dict.
-
+            results(dict): Decompressed ducmagic file as dict.
     '''
     if not os.path.isfile(DUC_MAGIC_STORE):
-        log.warn(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
-        return {}
+        log.debug(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
+        return dict()
 
     log.debug(f"Trying to read {DUC_MAGIC_STORE}.")
     if log.level == logging.DEBUG:
         st = time.time()
+
     with open(DUC_MAGIC_STORE, "rb") as fh:
         with bz2.open(fh) as d:
-            res = pickle.load(d)
+            try:
+                res = pickle.load(d)
+            except Exception as error:
+                log.error(f"{error}")
+                log.fatal(f"Error while reading {DUC_MAGIC_STORE}")
+                sys.exit(-1)
     if log.level == logging.DEBUG:
         log.debug(
             f"Read {DUC_MAGIC_STORE} in {time.time() - st} sec.")
     return res
+
+
+def do_sync():
+    '''
+    Load the duc db from disk, get all indexed paths,
+    compare this to what is available within ducmagcic db,
+    add missing entries.
+    '''
+
+    # Get all db's from current duc db.
+    for line in get_duc_info().splitlines()[1:]:
+        print(line.split())
 
 
 def do_info():
@@ -308,26 +325,31 @@ def do_info():
         log.info(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
 
 
-def do_ls(path: str, res: dict) -> dict:
+def do_ls(path: str, res: dict = {}) -> dict:
+    '''
+    Preform the ls function on the magic db.
+    Append the results to the existing inmem db.
+
+    For now this function also does the repr().
+    '''
+
     if not res:
         res = load_ducmagic()
 
+    path = os.path.abspath(os.path.expanduser(path))
+
     if path not in res:
-        print(f'{path} not found in {DUC_MAGIC_STORE}, \
-              run ducmagic index {path} first.')
-        return {}
+        err_msg = f'{path} not found in {DUC_MAGIC_STORE}, '
+        err_msg += f'run ducmagic index {path} first.'
+        return res
 
     pprint(res.get(path))
     return res.get(path)
 
 
-def do_index(path: str, res: dict) -> dict:
+def do_index(path: str, res: dict = {}) -> dict:
     if os.path.isfile(DUC_MAGIC_STORE):
         res = load_ducmagic()
-    else:
-        log.debug(f"No ducmagic db found at {DUC_MAGIC_STORE}")
-        if not res:
-            res = {}
 
     if not res.get(path):
         res[path] = {}
@@ -346,6 +368,9 @@ def do_index(path: str, res: dict) -> dict:
         else:
             res[path][ftype].append(file_path)
 
+    if not res[path]:
+        return dict()
+
     log.debug(f"Trying to write out ducmagic db at {DUC_MAGIC_STORE}")
     gc.disable()
 
@@ -359,6 +384,7 @@ def do_index(path: str, res: dict) -> dict:
         sys.exit(-1)
     finally:
         gc.enable()
+    log.debug(f"Write out ducmagic to {DUC_MAGIC_STORE} completed.")
 
     return res
 
