@@ -21,6 +21,7 @@ cd ducmagic
 pip install .
 
 duc index .
+ducmagic index .
 ducmagic ls .
 ```
 
