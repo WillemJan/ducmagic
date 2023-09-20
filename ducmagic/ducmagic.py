@@ -306,6 +306,7 @@ def do_sync():
     '''
 
     # Get all db's from current duc db.
+    # TODO
     for line in get_duc_info().splitlines()[1:]:
         print(line.split())
 
@@ -320,6 +321,7 @@ def do_info():
         for p in res.keys():
             log.info(f'Path found: {p}')
         for line in get_duc_info().splitlines():
+            # TODO
             print(line)
     else:
         log.info(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
@@ -330,6 +332,13 @@ def do_ls(path: str, res: dict = {}) -> dict:
     Preform the ls function on the magic db.
     Append the results to the existing inmem db.
 
+        Parameters:
+            path(str): Path to preform the ducmagic ls on.
+            res(dict): Current in-mem db for ducmagic.
+
+        Returns:
+            results(dict): Per file-type contains list of files.
+
     For now this function also does the repr().
     '''
 
@@ -337,14 +346,14 @@ def do_ls(path: str, res: dict = {}) -> dict:
         res = load_ducmagic()
 
     path = os.path.abspath(os.path.expanduser(path))
+    roots = sorted([i for i in list(res.keys())], key=len, reverse=True)
 
-    if path not in res:
-        err_msg = f'{path} not found in {DUC_MAGIC_STORE}, '
-        err_msg += f'run ducmagic index {path} first.'
-        return res
+    if path in roots:
+        pprint(res.get(path))
+        return res.get(path)
 
-    pprint(res.get(path))
-    return res.get(path)
+    # TODO: Make a simple backoff strategy.
+    print(path, 'not in', roots)
 
 
 def do_index(path: str, res: dict = {}) -> dict:
