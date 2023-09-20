@@ -34,10 +34,12 @@ DUC_MAGIC_STORE = os.path.expanduser(
 )  # Store output here for now, no questions asked.
 
 DUC_BINARY = "/usr/bin/duc"  # Path to installed duc.
+DUC_STORE = os.path.expanduser('~/.duc.db')
 
 # Parameters to pass to duc.
+# For now, will only work with ~/.duc.db.
 # (apparent size, show bytes, recursion, show full_path)
-DUC_PARAMS = "ls -a -b -R --full-path"
+DUC_PARAMS = f"ls -d {DUC_STORE} -a -b -R --full-path"
 
 cmagic = cmagic.Magic(no_check_compress=True,
                       mime_encoding=False,
@@ -67,36 +69,70 @@ options and detailed description of the subcommand.
 Use 'ducmagic help --all' for a complete list of all options for all subcommands.
 '''
 
+def get_duc_info() -> str:
+    '''
+    Returns info on the current duc db.
+
+        Parameters:
+            None
+
+        Returns:
+            output (str): See man duc(1) section info.
+
+    >>> len(get_duc_info()) >= 0
+    True
+    '''
+
+    cmd = f"{DUC_BINARY} info"
+    return do_cmd(cmd)
+
+
+def do_duc_info():
+    index = []
+    for line in get_duc_info().splitlines()[1:]:
+        duc_info = line.split()
+        index.append(duc_info)
+    return index
+
 
 def do_is_sane() -> int:
     '''
     We refuse to directly communicate with the linkable .so from the
     upstream duc procject, so at startup we must make sure we are sane.
+    Als preform some internal check to make sure it is possible to exec
+    an index or ls call at all.
 
         Parameters:
                 None
 
         Returns:
-               sanity level (int):
+            duc_ok (int):
                     -1 Duc missing.
                     0 Duc found.
-                    1 Duc found, duc_db found.
-                    2 Duc found, duc info is avail
+                    1 Duc found, duc db found.
+                    2 Duc found, duc info is avail,
                                  and contains at least one path.
-              duc_paths (set):
-                    duc_paths available set.
+
+             ducmagic_ok (bool):
+                     False Ducmagic db not found.
+                     True Ducmagic db is available.
     '''
-    sane = 0
 
-    if not os.path.isfile(DUC_BINARY):
-        return -1
+    duc_ok = -1
+    if os.path.isfile(DUC_BINARY):
+        duc_ok += 1
+        if os.path.isfile(DUC_STORE):
+            print(DUC_STORE)
+            duc_ok += 1
+    if duc_ok == 1:
+        if do_duc_info():
+            duc_ok += 1
 
-    sane += 1
-    if os.path.abspath(os.path.expanduser('.duc.db')):
-        sane += 1
+    ducmagic_ok = False
+    if os.path.isfile(DUC_MAGIC_STORE):
+        ducmagic_ok = True
 
-    # TODO: add more sanity checks.
-    return sane
+    return (duc_ok, ducmagic_ok)
 
 
 def load_ducmagic() -> dict:
@@ -173,24 +209,6 @@ def get_file_type(file_path) -> str:
         # I'm not sure why I pass on the actual bytes here.
         # maybe for futher inspection? The mind is a mystery.
         return magic_out, magic_bytes
-
-
-def get_duc_info() -> str:
-    '''
-    Returns info on the current duc db.
-
-        Parameters:
-            None
-
-        Returns:
-            output (str): See man duc(1) section info.
-
-    >>> len(get_duc_info()) >= 0
-    True
-    '''
-
-    cmd = f"{DUC_BINARY} info"
-    return do_cmd(cmd)
 
 
 def get_duc_path(file_path: str) -> str:
@@ -286,13 +304,6 @@ def do_info() -> None:
             print(line)
     else:
         log.info(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
-
-
-def do_duc_info():
-    index = []
-    for line in get_duc_info().splitlines()[1:]:
-        index.append[line.split()]
-    return index
 
 
 def do_ls_filter(type_str: str, res: dict = {}) -> dict:
@@ -432,7 +443,13 @@ def cli(args=sys.argv) -> any:
         print(USAGE)
         sys.exit(0)
 
+    sane = do_is_sane()
+
     if sys.argv[1] == "index":
+        if sane[0] <= 1:
+            print('Duc db is empty, run: duc index.')
+            sys.exit(-1)
+
         if len(sys.argv) >= 2:
             res = load_ducmagic()
             for d in sys.argv[2:]:
@@ -445,6 +462,10 @@ def cli(args=sys.argv) -> any:
 
     ls_res = []
     if sys.argv[1] == "ls":
+        if not sane[1]:
+            print('Ducmagic db is empty, run: ducmagic index.')
+            sys.exit(-1)
+
         res = load_ducmagic()
         if len(sys.argv[2:]) > 0:
             for d in sys.argv[2:]:
