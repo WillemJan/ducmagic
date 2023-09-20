@@ -81,13 +81,58 @@ def do_is_sane() -> int:
                     -1 Duc missing.
                     0 Duc found.
                     1 Duc found, duc_db found.
-                    2 Duc found, duc info is avail.
+                    2 Duc found, duc info is avail
+                                 and contains at least one path.
               duc_paths (set):
                     duc_paths available set.
     '''
+    sane = 0
 
-    # todo
-    return
+    if not os.path.isfile(DUC_BINARY):
+        return -1
+
+    sane += 1
+    if os.path.abspath(os.path.expanduser('.duc.db')):
+        sane += 1
+
+    # TODO: add more sanity checks.
+    return sane
+
+
+def load_ducmagic() -> dict:
+    '''
+    Load the (compressed) ducmagic db from disk,
+    defaults to ~/.duc_magic.db
+
+        Parameters:
+            None
+
+        Returns:
+            results(dict): Decompressed ducmagic file as dict,
+                           or emprty dict.
+    '''
+
+    if not os.path.isfile(DUC_MAGIC_STORE):
+        log.debug(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
+        return {}
+
+    if log.level == logging.DEBUG:
+        log.debug(f"Trying to read {DUC_MAGIC_STORE}.")
+        st = time.time()
+
+    with open(DUC_MAGIC_STORE, "rb") as fh:
+        with bz2.open(fh) as d:
+            try:
+                res = pickle.load(d)
+            except Exception as error:
+                log.error(f"{error}")
+                log.fatal(f"Error while reading {DUC_MAGIC_STORE}")
+                sys.exit(-1)
+
+    if log.level == logging.DEBUG:
+        log.debug(
+            f"Read {DUC_MAGIC_STORE} in {time.time() - st} sec.")
+    return res
 
 
 def get_file_type(file_path) -> str:
@@ -152,15 +197,16 @@ def get_duc_path(file_path: str) -> str:
     '''
     Returns contents of duc db for given path.
 
-            Parameters:
-                    file_path (str): Path to get from duc db.
+        Parameters:
+            file_path (str): Path to get from duc db.
 
-            Returns:
-                    output (str): See man duc(1) section ls.
+        Returns:
+            output (str): See man duc(1) section ls.
 
     >>> len(get_duc_path('.')) > 0
     True
     '''
+
     cmd = f"{DUC_BINARY} {DUC_PARAMS} {file_path}"
     return do_cmd(cmd)
 
@@ -214,6 +260,149 @@ def get_file_types(wanted: set) -> list:
     return file_types
 
 
+def do_sync():
+    '''
+    Load the duc db from disk, get all indexed paths,
+    compare this to what is available within ducmagcic db,
+    add missing entries.
+    '''
+
+    # Get all db's from current duc db.
+    # TODO
+    return
+
+
+def do_info() -> None:
+    if os.path.isfile(DUC_MAGIC_STORE):
+        # todo: work with timestamps in ducmagic db.
+        m_time = os.path.getmtime(DUC_MAGIC_STORE)
+        dt_m = str(datetime.datetime.fromtimestamp(m_time))
+        log.info(f'Modified on: {dt_m}')
+        res = load_ducmagic()
+        for p in res.keys():
+            log.info(f'Path found: {p}')
+        for line in get_duc_info().splitlines():
+            # TODO
+            print(line)
+    else:
+        log.info(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
+
+
+def do_duc_info():
+    index = []
+    for line in get_duc_info().splitlines()[1:]:
+        index.append[line.split()]
+    return index
+
+
+def do_ls_filter(type_str: str, res: dict = {}) -> dict:
+    '''
+    Implement content filter here.
+    '''
+
+    return {}
+
+
+def do_ls(path: str, res: dict = {}) -> dict:
+    '''
+    Preform the ls function on the magic db.
+    Returns dict containing types and list of file-name and file-size.
+
+        Parameters:
+            path(str): Path to preform the ducmagic ls on.
+            res(dict): Current in-mem db for ducmagic.
+
+        Returns:
+            results(dict): Per file-type contains list of files and file-size.
+
+    For now this function also does the repr().
+    '''
+
+    if not res:
+        res = load_ducmagic()
+
+    path = os.path.abspath(os.path.expanduser(path))
+
+    roots = sorted([i for i in list(res.keys())
+                    if len(i) <= len(path)],
+                   key=len,
+                   reverse=True)
+
+    if path in roots:
+        pprint(res.get(path))
+        return res.get(path)
+
+    backoff_path = path
+
+    for i in range(Counter(path).get(os.path.sep)):
+        backoff_path = os.path.sep.join(backoff_path.split(os.path.sep)[:-1])
+        if backoff_path in roots:
+            break
+
+    if not backoff_path:
+        # Path not in index.
+        log.fatal(f'{path} not in ducmagic db, run ducmagic .')
+        return {path: {}}
+
+    # Try to backoff the given path.
+    res1 = {backoff_path: {}}
+    for f_type in list(res[backoff_path]):
+        for (f_name, f_size) in res[backoff_path][f_type]:
+            if f_name.startswith(path):
+                if f_type not in res1[backoff_path]:
+                    res1[backoff_path][f_type] = [(f_name, f_size)]
+                else:
+                    res1[backoff_path][f_type].append((f_name, f_size))
+
+    pprint(res1.get(backoff_path))
+    return res1
+
+
+def do_index(path: str, res: dict = {}) -> dict:
+    '''
+
+    '''
+    if os.path.isfile(DUC_MAGIC_STORE):
+        res = load_ducmagic()
+
+    if not res.get(path):
+        res[path] = {}
+    else:
+        log.debug(f"Re-indexing {path}")
+        res[path] = {}
+
+    duc_info = get_duc_path(path)
+    wanted, unwanted = remove_small_files(duc_info, path)
+    file_types = get_file_types(wanted)
+
+    for file_path, file_type in zip(wanted, file_types):
+        ftype = file_type[0]
+        if ftype not in res[path]:
+            res[path][ftype] = [file_path]
+        else:
+            res[path][ftype].append(file_path)
+
+    if not res[path]:
+        return {}
+
+    log.debug(f"Trying to write out ducmagic db at {DUC_MAGIC_STORE}")
+    gc.disable()
+
+    try:
+        gc.collect()
+        with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
+            pickle.dump(res, fh)
+    except Exception as error:
+        log.error(f"{error.strerror}")
+        log.fatal(f"Error while writing to {DUC_MAGIC_STORE}")
+        sys.exit(-1)
+    finally:
+        gc.enable()
+
+    log.debug(f"Write out ducmagic to {DUC_MAGIC_STORE} completed.")
+    return res
+
+
 def cli(args=sys.argv) -> any:
     '''
     Command Line Interface.
@@ -264,160 +453,6 @@ def cli(args=sys.argv) -> any:
         else:
             d = os.path.abspath(os.getcwd())
             ls_res.append(do_ls(d, res))
-
-
-def load_ducmagic() -> dict:
-    '''
-    Load the (compressed) ducmagic db from disk,
-    defaults to ~/.duc_magic.db
-
-        Parameters:
-            None
-
-        Returns:
-            results(dict): Decompressed ducmagic file as dict.
-    '''
-    if not os.path.isfile(DUC_MAGIC_STORE):
-        log.debug(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
-        return dict()
-
-    log.debug(f"Trying to read {DUC_MAGIC_STORE}.")
-    if log.level == logging.DEBUG:
-        st = time.time()
-
-    with open(DUC_MAGIC_STORE, "rb") as fh:
-        with bz2.open(fh) as d:
-            try:
-                res = pickle.load(d)
-            except Exception as error:
-                log.error(f"{error}")
-                log.fatal(f"Error while reading {DUC_MAGIC_STORE}")
-                sys.exit(-1)
-    if log.level == logging.DEBUG:
-        log.debug(
-            f"Read {DUC_MAGIC_STORE} in {time.time() - st} sec.")
-    return res
-
-
-def do_sync():
-    '''
-    Load the duc db from disk, get all indexed paths,
-    compare this to what is available within ducmagcic db,
-    add missing entries.
-    '''
-
-    # Get all db's from current duc db.
-    # TODO
-    for line in get_duc_info().splitlines()[1:]:
-        print(line.split())
-
-
-def do_info():
-    if os.path.isfile(DUC_MAGIC_STORE):
-        # todo: work with timestamps in ducmagic db.
-        m_time = os.path.getmtime(DUC_MAGIC_STORE)
-        dt_m = str(datetime.datetime.fromtimestamp(m_time))
-        log.info(f'Modified on: {dt_m}')
-        res = load_ducmagic()
-        for p in res.keys():
-            log.info(f'Path found: {p}')
-        for line in get_duc_info().splitlines():
-            # TODO
-            print(line)
-    else:
-        log.info(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
-
-
-def do_ls(path: str, res: dict = {}) -> dict:
-    '''
-    Preform the ls function on the magic db.
-    Append the results to the existing inmem db.
-
-        Parameters:
-            path(str): Path to preform the ducmagic ls on.
-            res(dict): Current in-mem db for ducmagic.
-
-        Returns:
-            results(dict): Per file-type contains list of files.
-
-    For now this function also does the repr().
-    '''
-
-    if not res:
-        res = load_ducmagic()
-
-    path = os.path.abspath(os.path.expanduser(path))
-    roots = sorted([i for i in list(res.keys()) if len(i) <= len(path)], key=len, reverse=True)
-
-    if path in roots:
-        pprint(res.get(path))
-        return res.get(path)
-
-    backoff_path = path
-
-    for i in range(Counter(path).get(os.path.sep)):
-        backoff_path = os.path.sep.join(backoff_path.split(os.path.sep)[:-1])
-        if backoff_path in roots:
-            break
-
-    if not backoff_path:
-        # Path not in index.
-        log.fatal(f'{path} not in ducmagic db, run ducmagic .')
-        return {path: dict()}
-
-    # Try to backoff the given path.
-    res1 = {backoff_path: {}}
-    for f_type in list(res[backoff_path]):
-        for (f_name, f_size) in res[backoff_path][f_type]:
-            if f_name.startswith(path):
-                if not f_type in res1[backoff_path]:
-                    res1[backoff_path][f_type] = [(f_name, f_size)]
-                else:
-                    res1[backoff_path][f_type].append((f_name, f_size))
-
-    pprint(res1.get(backoff_path))
-    return res1
-
-def do_index(path: str, res: dict = {}) -> dict:
-    if os.path.isfile(DUC_MAGIC_STORE):
-        res = load_ducmagic()
-
-    if not res.get(path):
-        res[path] = {}
-    else:
-        log.debug(f"Re-indexing {path}")
-        res[path] = {}
-
-    duc_info = get_duc_path(path)
-    wanted, unwanted = remove_small_files(duc_info, path)
-    file_types = get_file_types(wanted)
-
-    for file_path, file_type in zip(wanted, file_types):
-        ftype = file_type[0]
-        if ftype not in res[path]:
-            res[path][ftype] = [file_path]
-        else:
-            res[path][ftype].append(file_path)
-
-    if not res[path]:
-        return dict()
-
-    log.debug(f"Trying to write out ducmagic db at {DUC_MAGIC_STORE}")
-    gc.disable()
-
-    try:
-        gc.collect()
-        with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
-            pickle.dump(res, fh)
-    except Exception as error:
-        log.error(f"{error.strerror}")
-        log.fatal(f"Error while writing to {DUC_MAGIC_STORE}")
-        sys.exit(-1)
-    finally:
-        gc.enable()
-    log.debug(f"Write out ducmagic to {DUC_MAGIC_STORE} completed.")
-
-    return res
 
 
 if __name__ == '__main__':
