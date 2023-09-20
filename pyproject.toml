@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-fancy-pypi-readme"]
+build-backend = "hatchling.build"
 
 [project]
 name = "ducmagic"
+description = "Dude, what are these bytes? A wrapper around Duc (Dude, where are my bytes)."
 version = "0.0.1"
-description = "A wrapper around Duc"
 authors = [
   { name = "Willem Jan Faber", email = "willemjan.faber@kb.nl" },
 ]

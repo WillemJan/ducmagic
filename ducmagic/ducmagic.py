@@ -12,6 +12,7 @@ import stat
 import sys
 import time
 import doctest
+from collections import Counter
 
 import cmagic
 
@@ -346,15 +347,36 @@ def do_ls(path: str, res: dict = {}) -> dict:
         res = load_ducmagic()
 
     path = os.path.abspath(os.path.expanduser(path))
-    roots = sorted([i for i in list(res.keys())], key=len, reverse=True)
+    roots = sorted([i for i in list(res.keys()) if len(i) <= len(path)], key=len, reverse=True)
 
     if path in roots:
         pprint(res.get(path))
         return res.get(path)
 
-    # TODO: Make a simple backoff strategy.
-    print(path, 'not in', roots)
+    backoff_path = path
 
+    for i in range(Counter(path).get(os.path.sep)):
+        backoff_path = os.path.sep.join(backoff_path.split(os.path.sep)[:-1])
+        if backoff_path in roots:
+            break
+
+    if not backoff_path:
+        # Path not in index.
+        log.fatal(f'{path} not in ducmagic db, run ducmagic .')
+        return {path: dict()}
+
+    # Try to backoff the given path.
+    res1 = {backoff_path: {}}
+    for f_type in list(res[backoff_path]):
+        for (f_name, f_size) in res[backoff_path][f_type]:
+            if f_name.startswith(path):
+                if not f_type in res1[backoff_path]:
+                    res1[backoff_path][f_type] = [(f_name, f_size)]
+                else:
+                    res1[backoff_path][f_type].append((f_name, f_size))
+
+    pprint(res1.get(backoff_path))
+    return res1
 
 def do_index(path: str, res: dict = {}) -> dict:
     if os.path.isfile(DUC_MAGIC_STORE):
