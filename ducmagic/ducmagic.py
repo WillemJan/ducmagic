@@ -385,10 +385,13 @@ def do_index(path: str, res: dict = {}) -> dict:
 
     for file_path, file_type in zip(wanted, file_types):
         ftype = file_type[0]
+        fpath, fsize = file_path
+        if ftype in ['Dir', 'Link']:
+            fsize = 0
         if ftype not in res[path]:
-            res[path][ftype] = [file_path]
+            res[path][ftype] = [(fpath, fsize)]
         else:
-            res[path][ftype].append(file_path)
+            res[path][ftype].append((fpath, fsize))
 
     if not res[path]:
         return {}
