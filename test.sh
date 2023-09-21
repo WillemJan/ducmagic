@@ -9,11 +9,11 @@ git clone https://github.com/WillemJan/ducmagic/
 virtualenv venv
 
 source venv/bin/activate
-duc index .
 
 cd ducmagic
 pip install .
 
 cd ..
+duc index .
 ducmagic index .
 ducmagic ls

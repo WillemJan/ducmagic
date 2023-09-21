@@ -66,8 +66,9 @@ options and detailed description of the subcommand.
 Use 'ducmagic help --all' for a complete list of all options for all subcommands.
 '''
 
+
 def get_duc_info() -> str:
-    '''
+    r'''
     Returns info on the current duc db.
 
         Parameters:
@@ -84,15 +85,29 @@ def get_duc_info() -> str:
     return do_cmd(cmd)
 
 
-def do_duc_info():
+def do_duc_info(duc_out: str = get_duc_info()) -> list:
+    r'''
+    Get's the command line output of duc info,
+    and parses it to computer readable form.
+
+    >>> duc_out="Date       Time       Files    Dirs    Size Path\n"
+    >>> duc_out+="2023-09-21 08:24:12     199     134    1.5M "
+    >>> duc_out+="/home/aloha/code/ducmagic"
+    >>> res = do_duc_info(duc_out)
+    >>> res[0][-1]
+    '/home/aloha/code/ducmagic'
+    '''
+
     index = []
-    for line in get_duc_info().splitlines()[1:]:
+
+    for line in duc_out.splitlines()[1:]:
         duc_info = line.split()
         index.append(duc_info)
+
     return index
 
 
-def do_is_sane() -> int:
+def do_is_sane() -> tuple[int, int]:
     '''
     We refuse to directly communicate with the linkable .so from the
     upstream duc procject, so at startup we must make sure we are sane.
@@ -265,6 +280,7 @@ def get_file_types(wanted: set) -> list:
 
         Parameters:
             wanted (set): Set of entries to process.
+
         Returns:
             file_types (list): List of file types using magic.
     '''
