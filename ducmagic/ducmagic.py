@@ -17,13 +17,13 @@ from collections import Counter
 import cmagic
 
 try:
-    from helper import setup_logger, \
-                       do_cmd, \
-                       E_DATABASE_NOT_FOUND
+    from helper import do_cmd, \
+                       E_DATABASE_NOT_FOUND, \
+                       log
 except ImportError:
-    from .helper import setup_logger, \
-                        do_cmd, \
-                        E_DATABASE_NOT_FOUND
+    from .helper import do_cmd, \
+                        E_DATABASE_NOT_FOUND, \
+                        log
 
 from pprint import pprint
 
@@ -45,9 +45,6 @@ cmagic = cmagic.Magic(no_check_compress=True,
                       mime_encoding=False,
                       mime_type=True)
 cmagic.load()
-
-
-log = setup_logger()
 
 USAGE = '''Usage: ducmagic [options] [args]
 

@@ -5,6 +5,47 @@ import subprocess
 E_DATABASE_NOT_FOUND = "Error opening:" # Duc's response if the db is not found.
 E_PATH_NOT_IN_INDEX = "Requested path not found"  # Duc's friendly error msg if path not in db.
 
+
+def _setup_logger(loglevel: int = logging.DEBUG,
+                 log_to_disk: str = "") -> logging.Logger:
+    '''
+    Setup log handler
+        Parameters:
+            log_to_disk (str): Write to filename, if provided.
+
+        Returns:
+            Instantiated log handler.
+
+    >>> log = setup_logger()
+    >>> log.debug('test')
+    '''
+
+    if log_to_disk:
+        # Setup loghandler to write to disk.
+        file_handler = logging.FileHandler(filename="tmp.log")
+
+    # Use stdout by default for logging.
+    stdout_handler = logging.StreamHandler(stream=sys.stdout)
+    handlers = [stdout_handler]
+
+    if log_to_disk:
+        handlers.append(file_handler)
+
+    # Define the log format.
+    logging.basicConfig(
+        level=loglevel,
+        format="[%(asctime)s] {%(filename)s:" +
+               "%(lineno)d} %(levelname)s - %(message)s",
+        handlers=handlers,
+    )
+
+    # Instantiate the logging object.
+    logger = logging.getLogger(__name__)
+
+    return logger
+
+log = _setup_logger(logging.DEBUG)
+
 def do_cmd(cmd: str) -> str:
     '''
     Returns the output of a shell command.
@@ -42,40 +83,4 @@ def do_cmd(cmd: str) -> str:
     return output.decode()
 
 
-def setup_logger(loglevel: int = logging.DEBUG,
-                 log_to_disk: str = "") -> logging.Logger:
-    '''
-    Setup log handler
-        Parameters:
-            log_to_disk (str): Write to filename, if provided.
 
-        Returns:
-            Instantiated log handler.
-
-    >>> log = setup_logger()
-    >>> log.debug('test')
-    '''
-
-    if log_to_disk:
-        # Setup loghandler to write to disk.
-        file_handler = logging.FileHandler(filename="tmp.log")
-
-    # Use stdout by default for logging.
-    stdout_handler = logging.StreamHandler(stream=sys.stdout)
-    handlers = [stdout_handler]
-
-    if log_to_disk:
-        handlers.append(file_handler)
-
-    # Define the log format.
-    logging.basicConfig(
-        level=loglevel,
-        format="[%(asctime)s] {%(filename)s:" +
-               "%(lineno)d} %(levelname)s - %(message)s",
-        handlers=handlers,
-    )
-
-    # Instantiate the logging object.
-    logger = logging.getLogger(__name__)
-
-    return logger
