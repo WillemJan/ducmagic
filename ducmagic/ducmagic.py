@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+ducmagic.py
+"""
+
 import bz2
 import datetime
 import gc
@@ -166,12 +170,12 @@ def load_ducmagic() -> dict:
 
     if log.level == logging.DEBUG:
         log.debug(f"Trying to read {DUC_MAGIC_STORE}.")
-        st = time.time()
+        start_time = time.time()
 
-    with open(DUC_MAGIC_STORE, "rb") as fh:
-        with bz2.open(fh) as d:
+    with open(DUC_MAGIC_STORE, "rb") as file_handle:
+        with bz2.open(file_handle) as data:
             try:
-                res = pickle.load(d)
+                res = pickle.load(data)
             except Exception as error:
                 log.error(f"{error}")
                 log.fatal(f"Error while reading {DUC_MAGIC_STORE}")
@@ -179,7 +183,7 @@ def load_ducmagic() -> dict:
 
     if log.level == logging.DEBUG:
         log.debug(
-            f"Read {DUC_MAGIC_STORE} in {time.time() - st} sec.")
+            "Read %s in %f sec.", (DUC_MAGIC_STORE,time.time() - start_time))
     return res
 
 
@@ -291,6 +295,8 @@ def get_file_types(wanted: set) -> list:
     return file_types
 
 
+
+"""
 def do_sync():
     '''
     Load the duc db from disk, get all indexed paths,
@@ -301,7 +307,7 @@ def do_sync():
     # Get all db's from current duc db.
     # TODO
     return
-
+"""
 
 def do_info() -> None:
     if os.path.isfile(DUC_MAGIC_STORE):
@@ -318,14 +324,14 @@ def do_info() -> None:
     else:
         log.info(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
 
-
+"""
 def do_ls_filter(type_str: str, res: dict = {}) -> dict:
     '''
     Implement content filter here.
     '''
 
     return {}
-
+"""
 
 def do_ls(path: str, res: dict = {}) -> dict:
     '''
@@ -382,10 +388,14 @@ def do_ls(path: str, res: dict = {}) -> dict:
     return res1
 
 
-def do_index(path: str, res: dict = {}) -> dict:
+def do_index(path: str, res: dict = None) -> dict:
+    '''
+    do_index:
     '''
 
-    '''
+    if res is None:
+        res = {}
+
     if os.path.isfile(DUC_MAGIC_STORE):
         res = load_ducmagic()
 
@@ -396,7 +406,7 @@ def do_index(path: str, res: dict = {}) -> dict:
         res[path] = {}
 
     duc_info = get_duc_path(path)
-    wanted, unwanted = remove_small_files(duc_info, path)
+    wanted, = remove_small_files(duc_info, path)
     file_types = get_file_types(wanted)
 
     for file_path, file_type in zip(wanted, file_types):
@@ -419,10 +429,8 @@ def do_index(path: str, res: dict = {}) -> dict:
         gc.collect()
         with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
             pickle.dump(res, fh)
-    except Exception as error:
-        log.error(f"{error.strerror}")
-        log.fatal(f"Error while writing to {DUC_MAGIC_STORE}")
-        sys.exit(-1)
+    except pickle.UnpicklingError as e:
+        raise e
     finally:
         gc.enable()
 
@@ -432,6 +440,8 @@ def do_index(path: str, res: dict = {}) -> dict:
 
 def cli(args=sys.argv) -> any:
     '''
+    cli:
+
     Command Line Interface.
 
     Takes in errors from users,
@@ -441,32 +451,32 @@ def cli(args=sys.argv) -> any:
     cmd_list = ["-h", "--help", "index",
                 "ls", "info", "--test"]
 
-    if len(sys.argv) == 1:
+    if len(args) == 1:
         print("No argument given.")
         print(USAGE)
         sys.exit(-1)
 
-    if not sys.argv[1] in cmd_list:
+    if not args[1] in cmd_list:
         print(f"Error, {sys.argv[1]} not a known argument.")
         print(USAGE)
         sys.exit(-1)
 
-    if sys.argv[1] == "info":
+    if args[1] == "info":
         do_info()
         sys.exit(0)
 
-    if sys.argv[1] == "--help":
+    if args[1] == "--help":
         print(USAGE)
         sys.exit(0)
 
     sane = do_is_sane()
 
-    if sys.argv[1] == "index":
+    if args[1] == "index":
         if sane[0] <= 1:
             print('Duc db is empty, run: duc index.')
             sys.exit(-1)
 
-        if len(sys.argv) >= 2:
+        if len(args) >= 2:
             res = load_ducmagic()
             for d in sys.argv[2:]:
                 d = os.path.abspath(os.path.expanduser(d))
@@ -477,7 +487,7 @@ def cli(args=sys.argv) -> any:
             res = do_index(d)
 
     ls_res = []
-    if sys.argv[1] == "ls":
+    if args[1] == "ls":
         if not sane[1]:
             print('Ducmagic db is empty, run: ducmagic index.')
             sys.exit(-1)
