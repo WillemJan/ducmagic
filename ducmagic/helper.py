@@ -61,26 +61,26 @@ def do_cmd(cmd: str) -> str:
     >>> _do_cmd('ls ' + __file__).find(__file__) > -1
     True
     '''
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=True
-    )
-    output, err = proc.communicate()
+    output = ""
 
-    if err:
-        if err.decode().startswith(E_PATH_NOT_IN_INDEX):
-            # todo: continue, but invoke duc.
-            # log.error(f'Error: {file_path} not in duc db.')
-            sys.exit(-1)
-        elif err.decode().startswith(E_DATABASE_NOT_FOUND):
-            return(E_DATABASE_NOT_FOUND)
+    with subprocess.Popen(cmd,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE,
+                          shell=True) as proc:
+
+        output, err = proc.communicate()
+
+        if err:
+            if err.decode().startswith(E_PATH_NOT_IN_INDEX):
+                # todo: continue, but invoke duc.
+                # log.error(f'Error: {file_path} not in duc db.')
+                sys.exit(-1)
+            elif err.decode().startswith(E_DATABASE_NOT_FOUND):
+                return(E_DATABASE_NOT_FOUND)
+            else:
+                log.error(err.decode())
+                sys.exit(-1)
         else:
-            log.error(err.decode())
-            sys.exit(-1)
+            output = output.decode()
 
-    return output.decode()
-
-
-
+    return output

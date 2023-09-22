@@ -5,7 +5,6 @@ ducmagic.py
 """
 
 import bz2
-import datetime
 import gc
 import logging
 import mmap
@@ -16,6 +15,8 @@ import stat
 import sys
 import time
 import doctest
+
+from pprint import pprint
 from collections import Counter
 
 import cmagic
@@ -29,7 +30,6 @@ except ImportError:
                         E_DATABASE_NOT_FOUND, \
                         log
 
-from pprint import pprint
 
 MIN_INSPECT = 30  # Nr of bytes to use for magic fingerprinting.
 
@@ -165,11 +165,11 @@ def load_ducmagic() -> dict:
     '''
 
     if not os.path.isfile(DUC_MAGIC_STORE):
-        log.debug(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
+        log.debug("Ducmagic db %s empty.", DUC_MAGIC_STORE)
         return {}
 
     if log.level == logging.DEBUG:
-        log.debug(f"Trying to read {DUC_MAGIC_STORE}.")
+        log.debug("Trying to read %s.", DUC_MAGIC_STORE)
         start_time = time.time()
 
     with open(DUC_MAGIC_STORE, "rb") as file_handle:
@@ -177,13 +177,12 @@ def load_ducmagic() -> dict:
             try:
                 res = pickle.load(data)
             except Exception as error:
-                log.error(f"{error}")
-                log.fatal(f"Error while reading {DUC_MAGIC_STORE}")
-                sys.exit(-1)
+                log.fatal("Error while reading %s", DUC_MAGIC_STORE)
+                raise error
 
     if log.level == logging.DEBUG:
         log.debug(
-            "Read %s in %f sec.", (DUC_MAGIC_STORE,time.time() - start_time))
+            "Read %s in %f sec.", DUC_MAGIC_STORE,time.time() - start_time)
     return res
 
 
@@ -206,21 +205,19 @@ def get_file_type(file_path) -> str:
     True
     '''
 
-    global cmagic
-
     file_path = file_path[0]
 
-    st = os.lstat(file_path)
-    ftype = stat.S_IFMT(st.st_mode)
+    file_stat = os.lstat(file_path)
+    ftype = stat.S_IFMT(file_stat.st_mode)
 
     if ftype == stat.S_IFLNK:
         return "Link", ""
     if ftype == stat.S_IFDIR:
         return "Dir", ""
 
-    with open(file_path, "rb") as f:
-        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-        magic_bytes = mm.read(MIN_INSPECT)
+    with open(file_path, "rb") as file_handle:
+        memmap = mmap.mmap(file_handle.fileno(), 0, access=mmap.ACCESS_READ)
+        magic_bytes = memmap.read(MIN_INSPECT)
         magic_out = cmagic.guess_bytes(magic_bytes)
         # I'm not sure why I pass on the actual bytes here.
         # maybe for futher inspection? The mind is a mystery.
@@ -295,45 +292,19 @@ def get_file_types(wanted: set) -> list:
     return file_types
 
 
-
-"""
-def do_sync():
-    '''
-    Load the duc db from disk, get all indexed paths,
-    compare this to what is available within ducmagcic db,
-    add missing entries.
-    '''
-
-    # Get all db's from current duc db.
-    # TODO
-    return
-"""
-
 def do_info() -> None:
+    """
+    do_info
+
+    """
+    m_time = ""
     if os.path.isfile(DUC_MAGIC_STORE):
-        # todo: work with timestamps in ducmagic db.
         m_time = os.path.getmtime(DUC_MAGIC_STORE)
-        dt_m = str(datetime.datetime.fromtimestamp(m_time))
-        log.info(f'Modified on: {dt_m}')
-        res = load_ducmagic()
-        for p in res.keys():
-            log.info(f'Path found: {p}')
-        for line in get_duc_info().splitlines():
-            # TODO
-            print(line)
-    else:
-        log.info(f"Ducmagic db {DUC_MAGIC_STORE} empty.\n")
 
-"""
-def do_ls_filter(type_str: str, res: dict = {}) -> dict:
-    '''
-    Implement content filter here.
-    '''
+    return m_time
 
-    return {}
-"""
 
-def do_ls(path: str, res: dict = {}) -> dict:
+def do_ls(path: str, res: dict = None) -> dict:
     '''
     Preform the ls function on the magic db.
     Returns dict containing types and list of file-name and file-size.
@@ -347,6 +318,9 @@ def do_ls(path: str, res: dict = {}) -> dict:
 
     For now this function also does the repr().
     '''
+
+    if res is None:
+        res = {}
 
     if not res:
         res = load_ducmagic()
@@ -371,7 +345,7 @@ def do_ls(path: str, res: dict = {}) -> dict:
 
     if not backoff_path:
         # Path not in index.
-        log.fatal(f'{path} not in ducmagic db, run ducmagic .')
+        log.fatal('%s not in ducmagic db, run ducmagic .', path)
         return {path: {}}
 
     # Try to backoff the given path.
@@ -402,11 +376,11 @@ def do_index(path: str, res: dict = None) -> dict:
     if not res.get(path):
         res[path] = {}
     else:
-        log.debug(f"Re-indexing {path}")
+        log.debug("Re-indexing %s", path)
         res[path] = {}
 
     duc_info = get_duc_path(path)
-    wanted, = remove_small_files(duc_info, path)
+    wanted, _ = remove_small_files(duc_info, path)
     file_types = get_file_types(wanted)
 
     for file_path, file_type in zip(wanted, file_types):
@@ -422,23 +396,66 @@ def do_index(path: str, res: dict = None) -> dict:
     if not res[path]:
         return {}
 
-    log.debug(f"Trying to write out ducmagic db at {DUC_MAGIC_STORE}")
+    log.debug("Trying to write out ducmagic db at %s",
+              DUC_MAGIC_STORE)
+
     gc.disable()
 
     try:
         gc.collect()
-        with bz2.open(DUC_MAGIC_STORE, "wb") as fh:
-            pickle.dump(res, fh)
-    except pickle.UnpicklingError as e:
-        raise e
+        with bz2.open(DUC_MAGIC_STORE, "wb") as file_handle:
+            pickle.dump(res, file_handle)
+    except pickle.UnpicklingError as error:
+        raise error
     finally:
         gc.enable()
 
-    log.debug(f"Write out ducmagic to {DUC_MAGIC_STORE} completed.")
+    log.debug("Write out ducmagic to %s completed.",
+              DUC_MAGIC_STORE)
+
     return res
 
 
-def cli(args=sys.argv) -> any:
+def cli_handle_index(sane: list, args: list) -> None:
+    '''
+    cli_handle_index
+    '''
+
+    if sane[0] <= 1:
+        log.fatal('Duc db is empty, run: duc index .')
+        sys.exit(-1)
+
+    if len(args) >= 2:
+        result = load_ducmagic()
+        for path in args[2:]:
+            path = os.path.abspath(os.path.expanduser(path))
+            do_index(path, result)
+    else:
+        result = load_ducmagic()
+        path = os.getcwd()
+        do_index(path, result)
+
+
+def cli_handle_ls(sane: list, args: list) -> None:
+    '''
+    cli_handle_ls
+    '''
+    if not sane[1]:
+        log.fatal('Ducmagic db is empty, run: ducmagic index .')
+        sys.exit(-1)
+
+    res = load_ducmagic()
+
+    if len(args[2:]) > 0:
+        for path in args[2:]:
+            path = os.path.abspath(os.path.expanduser(path))
+            do_ls(path, res)
+    else:
+        path = os.path.abspath(os.getcwd())
+        do_ls(path, res)
+
+
+def cli(args=None) -> any:
     '''
     cli:
 
@@ -448,16 +465,21 @@ def cli(args=sys.argv) -> any:
     and tries to make the best of it.
     '''
 
+    if args is None:
+        args = sys.argv
+
     cmd_list = ["-h", "--help", "index",
                 "ls", "info", "--test"]
 
     if len(args) == 1:
-        print("No argument given.")
+        log.fatal("No argument given.")
         print(USAGE)
         sys.exit(-1)
 
     if not args[1] in cmd_list:
-        print(f"Error, {sys.argv[1]} not a known argument.")
+        log.fatal("Error, %s not a known argument.",
+              args[1])
+
         print(USAGE)
         sys.exit(-1)
 
@@ -472,35 +494,10 @@ def cli(args=sys.argv) -> any:
     sane = do_is_sane()
 
     if args[1] == "index":
-        if sane[0] <= 1:
-            print('Duc db is empty, run: duc index.')
-            sys.exit(-1)
+        cli_handle_index(sane, args)
 
-        if len(args) >= 2:
-            res = load_ducmagic()
-            for d in sys.argv[2:]:
-                d = os.path.abspath(os.path.expanduser(d))
-                res = do_index(d, res)
-        else:
-            res = load_ducmagic()
-            d = os.getcwd()
-            res = do_index(d)
-
-    ls_res = []
     if args[1] == "ls":
-        if not sane[1]:
-            print('Ducmagic db is empty, run: ducmagic index.')
-            sys.exit(-1)
-
-        res = load_ducmagic()
-        if len(sys.argv[2:]) > 0:
-            for d in sys.argv[2:]:
-                d = os.path.abspath(os.path.expanduser(d))
-                ls_res.append(do_ls(d, res))
-        else:
-            d = os.path.abspath(os.getcwd())
-            ls_res.append(do_ls(d, res))
-
+        cli_handle_ls(sane, args)
 
 if __name__ == '__main__':
     doctest.testmod(verbose=True)
