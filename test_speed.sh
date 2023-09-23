@@ -1,6 +1,6 @@
 echo "Initial"
-time (duc index .; ducmagic index .; ducmagic ls .)
-echo
-
+/usr/bin/time -o time (duc index / > /dev/null; ducmagic index / > /dev/null; ducmagic ls / > /dev/null)
+(echo "Initial time to index with DUC and ducmagic"; cat time) | cowsay
 echo "Cache"
-time (ducmagic ls .)
+/usr/bin/time -o time (ducmagic ls / > /dev/null)
+(echo "Cached ducmagic call."; cat time) | cowsay
