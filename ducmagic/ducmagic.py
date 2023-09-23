@@ -204,7 +204,11 @@ def get_file_type(file_path) -> str:
 
     file_path = file_path[0]
 
-    file_stat = os.lstat(file_path)
+    try:
+        file_stat = os.lstat(file_path)
+    except FileNotFoundError:
+        return "None", ""
+
     ftype = stat.S_IFMT(file_stat.st_mode)
 
     if ftype == stat.S_IFLNK:
@@ -380,6 +384,7 @@ def do_ls(path: str, res: dict = None) -> dict:
     backoff = backoff.get(backoff_path)
     pprint(backoff)
     return backoff
+
 
 def do_index(path: str, res: dict = None) -> dict:
     '''
