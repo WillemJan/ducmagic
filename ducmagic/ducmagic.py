@@ -207,6 +207,9 @@ def get_file_type(file_path) -> str:
     file_stat = os.lstat(file_path)
     ftype = stat.S_IFMT(file_stat.st_mode)
 
+    mask = oct(file_stat.st_mode)[-3:]
+    print(mask)
+
     if ftype == stat.S_IFLNK:
         return "Link", ""
     if ftype == stat.S_IFDIR:
