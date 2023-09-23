@@ -207,8 +207,6 @@ def get_file_type(file_path) -> str:
     file_stat = os.lstat(file_path)
     ftype = stat.S_IFMT(file_stat.st_mode)
 
-    mask = oct(file_stat.st_mode)[-3:]
-
     if ftype == stat.S_IFLNK:
         return "Link", ""
     if ftype == stat.S_IFDIR:
@@ -222,10 +220,11 @@ def get_file_type(file_path) -> str:
             # I'm not sure why I pass on the actual bytes here.
             # maybe for futher inspection? The mind is a mystery.
             return magic_out, magic_bytes
+    except PermissionError:
+        mask = oct(file_stat.st_mode)[-3:]
+        return "None", mask
     except IOError as error:
         raise error
-    except PermissionError:
-        return "None", ""
 
 
 def get_duc_path(file_path: str) -> str:
