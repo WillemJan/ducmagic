@@ -223,8 +223,9 @@ def get_file_type(file_path) -> str:
             # maybe for futher inspection? The mind is a mystery.
             return magic_out, magic_bytes
     except IOError as error:
-        print(mask)
         raise error
+    except PermissionError:
+        return "None", ""
 
 
 def get_duc_path(file_path: str) -> str:
@@ -405,7 +406,7 @@ def do_index(path: str, res: dict = None) -> dict:
     for file_path, file_type in zip(wanted, file_types):
         ftype = file_type[0]
         fpath, fsize = file_path
-        if ftype in ['Dir', 'Link']:
+        if ftype in ['Dir', 'Link', 'None']:
             fsize = 0
         if ftype not in res[path]:
             res[path][ftype] = [(fpath, fsize)]
