@@ -208,20 +208,23 @@ def get_file_type(file_path) -> str:
     ftype = stat.S_IFMT(file_stat.st_mode)
 
     mask = oct(file_stat.st_mode)[-3:]
-    print(mask)
 
     if ftype == stat.S_IFLNK:
         return "Link", ""
     if ftype == stat.S_IFDIR:
         return "Dir", ""
 
-    with open(file_path, "rb") as file_handle:
-        memmap = mmap.mmap(file_handle.fileno(), 0, access=mmap.ACCESS_READ)
-        magic_bytes = memmap.read(MIN_INSPECT)
-        magic_out = cmagic.guess_bytes(magic_bytes)
-        # I'm not sure why I pass on the actual bytes here.
-        # maybe for futher inspection? The mind is a mystery.
-        return magic_out, magic_bytes
+    try:
+        with open(file_path, "rb") as file_handle:
+            memmap = mmap.mmap(file_handle.fileno(), 0, access=mmap.ACCESS_READ)
+            magic_bytes = memmap.read(MIN_INSPECT)
+            magic_out = cmagic.guess_bytes(magic_bytes)
+            # I'm not sure why I pass on the actual bytes here.
+            # maybe for futher inspection? The mind is a mystery.
+            return magic_out, magic_bytes
+    except IOError as error:
+        print(mask)
+        raise error
 
 
 def get_duc_path(file_path: str) -> str:
