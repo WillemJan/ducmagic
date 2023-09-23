@@ -1,6 +1,12 @@
 # Ducmagic
 # Dude, what are these bytes
 
+https://github.com/OWNER/REPOSITORY/actions/workflows/WORKFLOW-FILE/badge.svg
+
+
+![Pylint](https://github.com/willemjan/ducmagic/actions/workflows/pylint.yml/badge.svg)
+
+
 About
 =====
 This is a wrapper for [Duc](https://github.com/zevv/duc/).
