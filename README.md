@@ -2,8 +2,8 @@
 # Dude, what are these bytes
 
 
-![Linter](https://github.com/willemjan/ducmagic/workflows/pylint.yml/badge.svg)]
-![Tests](https://github.com/willemjan/ducmagic/workflows/python-app.yml/badge.svg)]
+![Linter](https://github.com/willemjan/ducmagic/workflows/pylint.yml/badge.svg)](https://github.com/willemjan/ducmagic/workflows/pylint.yml/badge.svg)
+![Tests](https://github.com/willemjan/ducmagic/workflows/python-app.yml/badge.svg)](https://github.com/willemjan/ducmagic/workflows/pylint.yml/badge.svg)
 
 
 About
