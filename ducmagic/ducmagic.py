@@ -227,7 +227,7 @@ def get_file_type(file_path) -> str:
             # maybe for futher inspection? The mind is a mystery.
             return magic_out, magic_bytes
     except IOError as error:
-        raise error
+        return "None", ""
 
 
 def get_duc_path(file_path: str) -> str:
