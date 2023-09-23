@@ -1,3 +1,7 @@
+"""
+ducmagic helper.
+"""
+
 import logging
 import sys
 import subprocess
@@ -72,11 +76,9 @@ def do_cmd(cmd: str) -> str:
 
         if err:
             if err.decode().startswith(E_PATH_NOT_IN_INDEX):
-                # todo: continue, but invoke duc.
-                # log.error(f'Error: {file_path} not in duc db.')
                 sys.exit(-1)
             elif err.decode().startswith(E_DATABASE_NOT_FOUND):
-                return(E_DATABASE_NOT_FOUND)
+                output = E_DATABASE_NOT_FOUND
             else:
                 log.error(err.decode())
                 sys.exit(-1)

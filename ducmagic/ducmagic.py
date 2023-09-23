@@ -55,19 +55,15 @@ USAGE = '''Usage: ducmagic [options] [args]
 Available subcommands:
 
   help      : Show help
-  index     : Scan the filesystem and generate the Duc index
+  index     : Scan the filesystem and generate the Ducmagic index
   info      : Dump database info
   ls        : List sizes of directory
+
   sync      : Sync ducmagic with duc
 
 Global options:
   -h,  --help                show help
        --version             output version information and exit
-
-Use 'ducmagic help <subcommand>' or 'ducmagic <subcommand> -h' for a complete list of all
-options and detailed description of the subcommand.
-
-Use 'ducmagic help --all' for a complete list of all options for all subcommands.
 '''
 
 
@@ -182,7 +178,8 @@ def load_ducmagic() -> dict:
 
     if log.level == logging.DEBUG:
         log.debug(
-            "Read %s in %f sec.", DUC_MAGIC_STORE,time.time() - start_time)
+            "Read %s in %f sec.", DUC_MAGIC_STORE,
+            time.time() - start_time)
     return res
 
 
@@ -477,9 +474,7 @@ def cli(args=None) -> any:
         sys.exit(-1)
 
     if not args[1] in cmd_list:
-        log.fatal("Error, %s not a known argument.",
-              args[1])
-
+        log.fatal("Error, %s not a known argument.", args[1])
         print(USAGE)
         sys.exit(-1)
 
@@ -498,6 +493,7 @@ def cli(args=None) -> any:
 
     if args[1] == "ls":
         cli_handle_ls(sane, args)
+
 
 if __name__ == '__main__':
     doctest.testmod(verbose=True)
