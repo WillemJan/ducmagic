@@ -20,7 +20,7 @@ def _setup_logger(loglevel: int = logging.DEBUG,
         Returns:
             Instantiated log handler.
 
-    >>> log = setup_logger()
+    >>> log = _setup_logger()
     >>> log.debug('test')
     '''
 
@@ -64,7 +64,7 @@ def do_cmd(cmd: str) -> str:
 
     On error (stderr) this command halts the running code.
 
-    >>> _do_cmd('ls ' + __file__).find(__file__) > -1
+    >>> do_cmd('ls ' + __file__).find(__file__) > -1
     True
     '''
     output = ""
