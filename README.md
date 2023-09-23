@@ -1,7 +1,9 @@
 # Ducmagic
 # Dude, what are these bytes
 
-![Pylint](https://github.com/willemjan/ducmagic/actions/workflows/pylint.yml/badge.svg?event=push)
+
+![Linter](https://github.com/willemjan/ducmagic/workflows/pylint.yml/badge.svg)]
+![Tests](https://github.com/willemjan/ducmagic/workflows/python-app.yml/badge.svg)]
 
 
 About
