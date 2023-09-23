@@ -290,15 +290,40 @@ def get_file_types(wanted: set) -> list:
 
 
 def do_info() -> None:
-    """
+    '''
     do_info
 
-    """
+    '''
+
     m_time = ""
     if os.path.isfile(DUC_MAGIC_STORE):
         m_time = os.path.getmtime(DUC_MAGIC_STORE)
 
     return m_time
+
+
+def do_ls_backoff(res: dict,
+                  path: str = None,
+                  backoff_path: str = None) -> dict:
+
+    '''
+    do_ls_backoff.
+
+    When / is indexed and you are in /home/me,
+    ducmagic ls has to figure out that /home/me is indexed as /.
+    '''
+
+    # Try to backoff the given path.
+    res1 = {backoff_path: {}}
+    for f_type in list(res[backoff_path]):
+        for (f_name, f_size) in res[backoff_path][f_type]:
+            if f_name.startswith(path):
+                if f_type not in res1[backoff_path]:
+                    res1[backoff_path][f_type] = [(f_name, f_size)]
+                else:
+                    res1[backoff_path][f_type].append((f_name, f_size))
+
+    return res1
 
 
 def do_ls(path: str, res: dict = None) -> dict:
@@ -345,18 +370,9 @@ def do_ls(path: str, res: dict = None) -> dict:
         log.fatal('%s not in ducmagic db, run ducmagic .', path)
         return {path: {}}
 
-    # Try to backoff the given path.
-    res1 = {backoff_path: {}}
-    for f_type in list(res[backoff_path]):
-        for (f_name, f_size) in res[backoff_path][f_type]:
-            if f_name.startswith(path):
-                if f_type not in res1[backoff_path]:
-                    res1[backoff_path][f_type] = [(f_name, f_size)]
-                else:
-                    res1[backoff_path][f_type].append((f_name, f_size))
-
-    pprint(res1.get(backoff_path))
-    return res1
+    backoff = do_ls_backoff(res, path, backoff_path)
+    backoff = backoff.get(backoff_path)
+    pprint(backoff)
 
 
 def do_index(path: str, res: dict = None) -> dict:

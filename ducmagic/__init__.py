@@ -1,4 +1,5 @@
 """
 ducmagic __init__.py
 """
-from .ducmagic import *
+
+from .ducmagic import cli  # noqa
