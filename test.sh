@@ -20,6 +20,5 @@ pip install .
 cd ..
 duc index .
 ducmagic index .
-ducmagic ls
+ducmagic ls .
 python ducmagic/ducmagic/ducmagic.py
-
