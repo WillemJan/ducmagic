@@ -373,7 +373,7 @@ def do_ls(path: str, res: dict = None) -> dict:
     backoff = do_ls_backoff(res, path, backoff_path)
     backoff = backoff.get(backoff_path)
     pprint(backoff)
-
+    return backoff
 
 def do_index(path: str, res: dict = None) -> dict:
     '''
