@@ -224,6 +224,8 @@ def get_file_type(file_path) -> str:
             # I'm not sure why I pass on the actual bytes here.
             # maybe for futher inspection? The mind is a mystery.
             return magic_out, magic_bytes
+    except OSError:
+        return "None", ""
     except PermissionError:
         mask = oct(file_stat.st_mode)[-3:]
         return "None", mask
