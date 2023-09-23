@@ -226,7 +226,7 @@ def get_file_type(file_path) -> str:
             # I'm not sure why I pass on the actual bytes here.
             # maybe for futher inspection? The mind is a mystery.
             return magic_out, magic_bytes
-    except IOError as error:
+    except IOError:
         return "None", ""
 
 
