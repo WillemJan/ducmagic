@@ -11,7 +11,9 @@ echo "" >> time
 echo "Cache"
 /usr/bin/time -o time ducmagic ls / > /dev/null
 (echo "Cached ducmagic call."; cat time) | cowsay -f /usr/share/cowsay/cows/ren.cow
+echo
+echo "Ducmagic output"
+echo
+echo
 
-
-time find / -exec file '{}' ';'
 time ducmagic ls /

@@ -6,8 +6,8 @@ import logging
 import sys
 import subprocess
 
-E_DATABASE_NOT_FOUND = "Error opening:"  # Duc's response if the db is not found.
-E_PATH_NOT_IN_INDEX = "Requested path not found"  # Duc's friendly error msg if path not in db.
+E_DATABASE_NOT_FOUND = "Error opening:"  # duc error msg.
+E_PATH_NOT_IN_INDEX = "Requested path not found"  # duc error msg.
 
 
 def _setup_logger(loglevel: int = logging.DEBUG,
