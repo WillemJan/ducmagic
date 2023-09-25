@@ -3,6 +3,7 @@
 
 ![Linter](https://github.com/willemjan/ducmagic/actions/workflows/pylint.yml/badge.svg)
 ![Test](https://github.com/willemjan/ducmagic/actions/workflows/python-app.yml/badge.svg)
+[![Run_ducmagic_example](https://github.com/WillemJan/ducmagic/actions/workflows/example_run.yml/badge.svg)](https://github.com/WillemJan/ducmagic/actions/workflows/example_run.yml)
 
 About
 =====
