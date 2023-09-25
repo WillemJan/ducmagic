@@ -6,9 +6,9 @@ ducmagic __init__.py
 """
 
 from .ducmagic import cli  # noqa
-from .ducmagic import load_ducmagic # noqa
+from .ducmagic import load_ducmagic as load  # noqa
 
 __all__ = [
-    "load_ducmagic",
+    "load",
     "cli",
     ]
