@@ -2,6 +2,10 @@
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+packages = ["ducmagic"]
+
+
 [project]
 name = "ducmagic"
 description = "Dude, what are these bytes? A wrapper around Duc (Dude, where are my bytes)."
@@ -27,3 +31,4 @@ dependencies = [
 
 [project.scripts]
 ducmagic = "ducmagic:cli"
+
