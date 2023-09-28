@@ -134,7 +134,6 @@ def do_is_sane() -> tuple[int, int]:
     if os.path.isfile(DUC_BINARY):
         duc_ok += 1
         if os.path.isfile(DUC_STORE):
-            print(DUC_STORE)
             duc_ok += 1
     if duc_ok == 1:
         if do_duc_info():
@@ -226,7 +225,7 @@ def get_file_type(file_path) -> str:
             magic_bytes = memmap.read(MIN_INSPECT)
             magic_out = cmagic.guess_bytes(magic_bytes)
             # I'm not sure why I pass on the actual bytes here.
-            # maybe for futher inspection? The mind is a mystery.
+            # Maybe for futher inspection? Make checksums..
             return magic_out, magic_bytes
     except IOError:
         return "None", ""
@@ -348,8 +347,6 @@ def do_ls(path: str, res: dict = None) -> dict:
 
         Returns:
             results(dict): Per file-type contains list of files and file-size.
-
-    For now this function also does the repr().
     '''
 
     if res is None:
@@ -366,7 +363,6 @@ def do_ls(path: str, res: dict = None) -> dict:
                    reverse=True)
 
     if path in roots:
-        pprint(res.get(path))
         return res.get(path)
 
     backoff_path = path
@@ -383,7 +379,7 @@ def do_ls(path: str, res: dict = None) -> dict:
 
     backoff = do_ls_backoff(res, path, backoff_path)
     backoff = backoff.get(backoff_path)
-    pprint(backoff)
+
     return backoff
 
 
@@ -474,7 +470,7 @@ def cli_handle_ls(sane: list, args: list) -> None:
     if len(args[2:]) > 0:
         for path in args[2:]:
             path = os.path.abspath(os.path.expanduser(path))
-            do_ls(path, res)
+            pprint(do_ls(path, res))
     else:
         path = os.path.abspath(os.getcwd())
         do_ls(path, res)
@@ -498,12 +494,12 @@ def cli(args=None) -> any:
 
     if len(args) == 1:
         log.fatal("No argument given.")
-        print(USAGE)
+        log.info(USAGE)
         sys.exit(-1)
 
     if not args[1] in cmd_list:
         log.fatal("Error, %s not a known argument.", args[1])
-        print(USAGE)
+        log.info(USAGE)
         sys.exit(-1)
 
     if args[1] == "info":
@@ -511,7 +507,7 @@ def cli(args=None) -> any:
         sys.exit(0)
 
     if args[1] == "--help":
-        print(USAGE)
+        log.info(USAGE)
         sys.exit(0)
 
     sane = do_is_sane()
